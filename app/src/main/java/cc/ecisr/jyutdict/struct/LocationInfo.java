@@ -7,7 +7,7 @@ import org.json.JSONObject;
 import android.util.Log;
 
 import java.util.ArrayList;
-import java.util.Comparator;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -107,6 +107,7 @@ public class LocationInfo {
                 Log.e(TAG, "Ignoring malformed location record", e);
             }
         }
+        Collections.sort(locationList, LocationInfo::compareGeographically);
         isLoaded = true;
     }
 
@@ -118,17 +119,32 @@ public class LocationInfo {
         return locationMap.get(id);
     }
 
-    /** Stable geographic ordering for results that otherwise follow backend ID order. */
+    /** History first, then province/prefecture, county and collection point, never API ID order. */
     public static int compareGeographically(Location left, Location right) {
         if (left == right) return 0;
         if (left == null) return 1;
         if (right == null) return -1;
-        Comparator<String> strings = (a, b) -> a == b ? 0
-                : a == null ? -1 : b == null ? 1 : a.compareTo(b);
-        int comparison = strings.compare(left.second, right.second);
-        if (comparison == 0) comparison = strings.compare(left.third, right.third);
-        if (comparison == 0) comparison = strings.compare(left.first, right.first);
+        boolean leftHistorical = LocationOrder.historical(left);
+        boolean rightHistorical = LocationOrder.historical(right);
+        int comparison = Boolean.compare(rightHistorical, leftHistorical);
+        if (comparison != 0) return comparison;
+        if (!leftHistorical) {
+            LocationOrder.Group leftGroup = LocationOrder.group(left);
+            LocationOrder.Group rightGroup = LocationOrder.group(right);
+            comparison = Integer.compare(leftGroup.province, rightGroup.province);
+            if (comparison == 0) comparison = Integer.compare(leftGroup.city, rightGroup.city);
+            if (comparison == 0) comparison = leftGroup.name.compareTo(rightGroup.name);
+            if (comparison == 0) comparison = Integer.compare(leftGroup.county, rightGroup.county);
+        }
+        if (comparison == 0) comparison = LocationOrder.administrativeLabel(left.second)
+                .compareTo(LocationOrder.administrativeLabel(right.second));
+        if (comparison == 0) comparison = compareNames(left.third, right.third);
+        if (comparison == 0) comparison = compareNames(left.first, right.first);
         return comparison == 0 ? Integer.compare(left.id, right.id) : comparison;
+    }
+
+    private static int compareNames(String left, String right) {
+        return LocationOrder.normalize(left).compareTo(LocationOrder.normalize(right));
     }
 
     /** 兼容通用字表名稱、泛粵字表名稱經伺服器別名解析後的抽象地名。 */
