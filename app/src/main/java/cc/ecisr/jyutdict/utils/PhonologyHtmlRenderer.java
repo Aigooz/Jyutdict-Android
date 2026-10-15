@@ -9,6 +9,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 
+import cc.ecisr.jyutdict.utils.ChineseTextConverter;
+
 /** 將公開的程序音系 JSON 轉為四頁可切換的只讀 HTML 表。 */
 public final class PhonologyHtmlRenderer {
     private PhonologyHtmlRenderer() {
@@ -20,11 +22,14 @@ public final class PhonologyHtmlRenderer {
         html.append("<!doctype html><html><head><meta charset=\"utf-8\">")
                 .append("<meta name=\"viewport\" content=\"width=device-width,initial-scale=1,maximum-scale=5\">")
                 .append("<style>").append(css(darkMode)).append("</style></head><body>")
-                .append("<h1>").append(escape(report.optString("locationName", "音系表"))).append("</h1>")
-                .append("<p class=\"notice\">本表爲程序生成，音之分合均爲程序依條件熵所定。</p>");
+                .append("<h1>").append(escape(ChineseTextConverter.display(
+                        report.optString("locationName", "音系表")))).append("</h1>")
+                .append("<p class=\"notice\">").append(escape(ChineseTextConverter.display(
+                        "本表爲程序生成，音之分合均爲程序依條件熵所定。"))).append("</p>");
 
         if (sections == null || sections.length() == 0) {
-            return html.append("<p>音系表沒有可顯示的分區。</p></body></html>").toString();
+            return html.append("<p>").append(escape(ChineseTextConverter.display(
+                    "音系表沒有可顯示的分區。"))).append("</p></body></html>").toString();
         }
 
         for (int i = 0; i < sections.length(); i++) {
@@ -36,7 +41,8 @@ public final class PhonologyHtmlRenderer {
             JSONObject section = sections.optJSONObject(i);
             if (section == null) continue;
             html.append("<label role=\"tab\" for=\"tab-").append(i).append("\">")
-                    .append(escape(section.optString("label", "音系"))).append("</label>");
+                    .append(escape(ChineseTextConverter.display(
+                            section.optString("label", "音系")))).append("</label>");
         }
         html.append("</nav><div class=\"section-stack\">");
 
@@ -44,7 +50,8 @@ public final class PhonologyHtmlRenderer {
             JSONObject section = sections.optJSONObject(i);
             if (section == null) continue;
             html.append("<section class=\"phonology-section section-").append(i).append("\">")
-                    .append("<h2>").append(escape(section.optString("label", "音系"))).append("</h2>")
+                    .append("<h2>").append(escape(ChineseTextConverter.display(
+                            section.optString("label", "音系")))).append("</h2>")
                     .append(renderSection(section, darkMode))
                     .append("</section>");
         }
@@ -67,19 +74,26 @@ public final class PhonologyHtmlRenderer {
         calculateMerges(rows, conditionDepth);
         StringBuilder result = new StringBuilder();
         result.append("<div class=\"section-tools\"><input class=\"table-filter\" type=\"search\" ")
-                .append("placeholder=\"篩選中古音、現音、條件或例字\" ")
-                .append("aria-label=\"篩選中古音、現音、條件或例字\"></div>")
+                .append("placeholder=\"").append(escape(ChineseTextConverter.display(
+                        "篩選中古音、現音、條件或例字"))).append("\" ")
+                .append("aria-label=\"").append(escape(ChineseTextConverter.display(
+                        "篩選中古音、現音、條件或例字"))).append("\"></div>")
                 .append("<div class=\"table-wrap\"><table data-merge-columns=\"")
                 .append(conditionDepth + 1)
                 .append("\"><thead><tr><th class=\"position-head base-head\">")
-                .append(escape(section.optString("baseLabel", "中古音"))).append("</th>");
+                .append(escape(ChineseTextConverter.display(
+                        section.optString("baseLabel", "中古音")))).append("</th>");
         for (int condition = 0; condition < conditionDepth; condition++) {
-            result.append("<th class=\"position-head condition-head\">條件 ")
+            result.append("<th class=\"position-head condition-head\">")
+                    .append(escape(ChineseTextConverter.display("條件")))
                     .append(condition + 1).append("</th>");
         }
         result.append("<th class=\"target-heading\">")
-                .append(escape(section.optString("outcomeLabel", "現代音")))
-                .append("</th><th>轄字</th><th>例字</th></tr></thead><tbody>");
+                .append(escape(ChineseTextConverter.display(
+                        section.optString("outcomeLabel", "現代音"))))
+                .append("</th><th>").append(escape(ChineseTextConverter.display("轄字")))
+                .append("</th><th>").append(escape(ChineseTextConverter.display("例字")))
+                .append("</th></tr></thead><tbody>");
 
         for (RowData row : rows) {
             result.append("<tr class=\"data-row\" data-search=\"")
@@ -102,7 +116,8 @@ public final class PhonologyHtmlRenderer {
                 }
                 result.append(">");
                 if (baseColumn) {
-                    result.append(escape(emptyAsNull(row.rule.optString("base", ""))));
+                    result.append(escape(ChineseTextConverter.display(
+                            emptyAsNull(row.rule.optString("base", "")))));
                 } else {
                     JSONArray conditions = row.rule.optJSONArray("conditions");
                     JSONArray condition = conditions == null
@@ -112,9 +127,11 @@ public final class PhonologyHtmlRenderer {
                         result.append("—");
                     } else {
                         result.append("<small>")
-                                .append(escape(condition.optString(0, "")))
+                                .append(escape(ChineseTextConverter.display(
+                                        condition.optString(0, ""))))
                                 .append("</small> <strong>")
-                                .append(escape(condition.optString(1, "")))
+                                .append(escape(ChineseTextConverter.display(
+                                        condition.optString(1, ""))))
                                 .append("</strong>");
                     }
                 }
@@ -144,7 +161,8 @@ public final class PhonologyHtmlRenderer {
         result.append("<tr class=\"no-results\"")
                 .append(rows.isEmpty() ? "" : " style=\"display:none\"")
                 .append("><td colspan=\"").append(conditionDepth + 4)
-                .append("\">沒有符合條件的行</td></tr>");
+                .append("\">").append(escape(ChineseTextConverter.display("沒有符合條件的行")))
+                .append("</td></tr>");
         return result.append("</tbody></table></div>").toString();
     }
 
@@ -212,18 +230,20 @@ public final class PhonologyHtmlRenderer {
     }
 
     private static String searchText(JSONObject rule, JSONObject outcome) {
-        StringBuilder text = new StringBuilder(rule.optString("base", ""));
+        StringBuilder text = new StringBuilder(ChineseTextConverter.display(
+                rule.optString("base", "")));
         JSONArray conditions = rule.optJSONArray("conditions");
         if (conditions != null) {
             for (int index = 0; index < conditions.length(); index++) {
                 JSONArray condition = conditions.optJSONArray(index);
                 if (condition == null) continue;
                 for (int value = 0; value < condition.length(); value++) {
-                    text.append(' ').append(condition.optString(value, ""));
+                    text.append(' ').append(ChineseTextConverter.display(
+                            condition.optString(value, "")));
                 }
             }
         }
-        text.append(' ').append(outcome.optString("value", ""));
+        text.append(' ').append(ChineseTextConverter.display(outcome.optString("value", "")));
         JSONArray examples = outcome.optJSONArray("examples");
         if (examples != null) {
             for (int index = 0; index < examples.length(); index++) {
@@ -271,8 +291,10 @@ public final class PhonologyHtmlRenderer {
                 + ";--content-opacity:" + decimal(0.55 + prominence * 0.45)
                 + ";--relative:" + decimal(relative * 100) + "%\">"
                 + "<span class=\"outcome-bar" + (isShe ? " she" : "") + "\"></span>"
-                + "<span class=\"outcome-content\"><strong>" + escape(emptyAsNull(value)) + "</strong>"
-                + (isShe ? "<span class=\"she-badge\">攝</span>" : "")
+                + "<span class=\"outcome-content\"><strong>"
+                + escape(ChineseTextConverter.display(emptyAsNull(value))) + "</strong>"
+                + (isShe ? "<span class=\"she-badge\">"
+                + escape(ChineseTextConverter.display("攝")) + "</span>" : "")
                 + "</span></td>";
     }
 
@@ -293,7 +315,8 @@ public final class PhonologyHtmlRenderer {
                     .append(escape(example.optString("char", ""))).append("</span>");
             String note = example.optString("note", "");
             if (!note.isEmpty()) {
-                result.append("<small>(").append(escape(note)).append(")</small>");
+                result.append("<small>(").append(escape(ChineseTextConverter.display(note)))
+                        .append(")</small>");
             }
             result.append("</span>");
         }

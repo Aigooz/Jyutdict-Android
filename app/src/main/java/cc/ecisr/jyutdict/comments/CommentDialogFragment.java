@@ -14,12 +14,10 @@ import androidx.appcompat.app.AlertDialog;
 import java.util.Collections;
 
 import cc.ecisr.jyutdict.R;
-import cc.ecisr.jyutdict.auth.AuthRepository;
 import cc.ecisr.jyutdict.databinding.DialogCommentsBinding;
 import cc.ecisr.jyutdict.utils.MotionUtil;
-import cc.ecisr.jyutdict.utils.ToastUtil;
 
-/** Public comment viewer plus authenticated create/delete controls. */
+/** Public read-only comment viewer. */
 public final class CommentDialogFragment extends DialogFragment {
     public static final String RESULT_KEY = "comment_count_changed";
     public static final String RESULT_TYPE = "comment_type";
@@ -31,7 +29,6 @@ public final class CommentDialogFragment extends DialogFragment {
     private static final String ARG_LABEL = "label";
 
     private CommentRepository repository;
-    private AuthRepository authRepository;
     private CommentAdapter adapter;
     private DialogCommentsBinding binding;
     private String type;
@@ -55,16 +52,13 @@ public final class CommentDialogFragment extends DialogFragment {
         target = arguments.getString(ARG_TARGET, "");
         String label = arguments.getString(ARG_LABEL, target);
 
-        repository = new CommentRepository(requireContext());
-        authRepository = AuthRepository.getInstance(requireContext());
-        adapter = new CommentAdapter(this::confirmDelete);
+        repository = new CommentRepository();
+        adapter = new CommentAdapter();
 
         binding = DialogCommentsBinding.inflate(getLayoutInflater());
         binding.commentList.setLayoutManager(new LinearLayoutManager(requireContext()));
         MotionUtil.configureItemAnimator(binding.commentList);
         binding.commentList.setAdapter(adapter);
-        binding.commentSubmit.setOnClickListener(ignored -> submitComment());
-        updateAuthControls();
         loadComments();
 
         return new AlertDialog.Builder(requireContext())
@@ -72,15 +66,6 @@ public final class CommentDialogFragment extends DialogFragment {
                 .setView(binding.getRoot())
                 .setPositiveButton(R.string.button_confirm, null)
                 .create();
-    }
-
-    private void updateAuthControls() {
-        DialogCommentsBinding views = binding;
-        if (views == null) return;
-        boolean loggedIn = authRepository.isLoggedIn();
-        MotionUtil.beginLayoutTransition(views.commentStateContainer);
-        views.commentInput.setVisibility(loggedIn ? View.VISIBLE : View.GONE);
-        views.commentSubmit.setVisibility(loggedIn ? View.VISIBLE : View.GONE);
     }
 
     private void loadComments() {
@@ -95,56 +80,18 @@ public final class CommentDialogFragment extends DialogFragment {
             MotionUtil.beginLayoutTransition(callbackViews.commentStateContainer);
             callbackViews.commentLoading.setVisibility(View.GONE);
             if (comments == null) {
-                adapter.submit(Collections.emptyList(), authRepository.getCurrentUser(),
-                        authRepository.isAdmin());
+                adapter.submit(Collections.emptyList());
                 callbackViews.commentEmpty.setText(
                         getString(R.string.comment_load_failed, errorMessage));
                 callbackViews.commentEmpty.setVisibility(View.VISIBLE);
                 return;
             }
-            adapter.submit(comments, authRepository.getCurrentUser(), authRepository.isAdmin());
+            adapter.submit(comments);
             callbackViews.commentEmpty.setText(R.string.comment_empty);
             callbackViews.commentEmpty.setVisibility(
                     comments.isEmpty() ? View.VISIBLE : View.GONE);
             publishCount();
         });
-    }
-
-    private void submitComment() {
-        DialogCommentsBinding views = binding;
-        if (views == null) return;
-        CharSequence value = views.commentInput.getText();
-        String content = value == null ? "" : value.toString().trim();
-        if (content.isEmpty()) return;
-        views.commentSubmit.setEnabled(false);
-        repository.postComment(type, target, content, (success, errorMessage) -> {
-            DialogCommentsBinding callbackViews = binding;
-            if (!isAdded() || callbackViews == null) return;
-            callbackViews.commentSubmit.setEnabled(true);
-            if (!success) {
-                ToastUtil.msg(requireContext(), getString(R.string.comment_submit_failed, errorMessage));
-                return;
-            }
-            callbackViews.commentInput.setText("");
-            loadComments();
-        });
-    }
-
-    private void confirmDelete(Comment comment) {
-        new AlertDialog.Builder(requireContext())
-                .setMessage(R.string.comment_delete_confirm)
-                .setNegativeButton(R.string.button_cancel, null)
-                .setPositiveButton(R.string.comment_delete, (dialog, which) ->
-                        repository.deleteComment(type, comment.id, (success, errorMessage) -> {
-                            if (!isAdded()) return;
-                            if (!success) {
-                                ToastUtil.msg(requireContext(),
-                                        getString(R.string.comment_delete_failed, errorMessage));
-                                return;
-                            }
-                            loadComments();
-                        }))
-                .show();
     }
 
     private void publishCount() {

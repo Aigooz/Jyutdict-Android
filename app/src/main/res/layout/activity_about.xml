@@ -1,0 +1,273 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="?attr/clockBackground"
+    android:orientation="vertical"
+    tools:context=".AboutActivity">
+
+    <androidx.appcompat.widget.Toolbar
+        android:id="@+id/toolbar"
+        style="@style/Widget.Jyutdict.Toolbar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:minHeight="?attr/actionBarSize"
+        app:title="@string/about_title" />
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:clipToPadding="false"
+        android:fillViewport="true"
+        android:paddingHorizontal="16dp"
+        android:paddingTop="18dp"
+        android:paddingBottom="32dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/about_app_name"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/app_name"
+                android:textColor="?attr/clockTextColor"
+                android:textSize="24sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/about_version_value"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="5dp"
+                android:textColor="?attr/clockTextColorDim"
+                android:textSize="13sp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="18dp"
+                android:text="@string/about_original_value"
+                android:textColor="?attr/clockTextColor"
+                android:textSize="18sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:text="@string/about_original_summary"
+                android:textColor="?attr/clockTextColorDim"
+                android:textSize="14sp" />
+
+            <Button
+                android:id="@+id/btn_open_upstream"
+                style="@style/Widget.Jyutdict.LinkButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minHeight="48dp"
+                android:drawableStart="@drawable/ic_external_20"
+                android:drawablePadding="8dp"
+                android:text="@string/about_open_original_project" />
+
+            <Button
+                android:id="@+id/btn_open_license"
+                style="@style/Widget.Jyutdict.LinkButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minHeight="48dp"
+                android:text="@string/about_license_title" />
+
+            <Button
+                android:id="@+id/btn_open_source"
+                style="@style/Widget.Jyutdict.LinkButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minHeight="48dp"
+                android:drawableStart="@drawable/ic_external_20"
+                android:drawablePadding="8dp"
+                android:text="@string/about_open_source" />
+
+            <LinearLayout
+                style="@style/Widget.Jyutdict.AboutSection"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="18dp">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/about_maintainer_title"
+                    android:textColor="@color/colorPrimary"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="7dp"
+                    android:text="@string/about_maintainer_value"
+                    android:textColor="?attr/clockTextColor"
+                    android:textSize="16sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:text="@string/about_maintainer_summary"
+                    android:textColor="?attr/clockTextColorDim"
+                    android:textSize="13sp" />
+
+                <Button
+                    android:id="@+id/btn_open_profile"
+                    style="@style/Widget.Jyutdict.LinkButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="40dp"
+                    android:layout_marginTop="12dp"
+                    android:drawableStart="@drawable/ic_external_20"
+                    android:drawablePadding="8dp"
+                    android:drawableTint="?attr/clockTextColorDim"
+                    android:text="@string/about_open_profile" />
+
+                <Button
+                    android:id="@+id/btn_open_update_release"
+                    style="@style/Widget.Jyutdict.LinkButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="40dp"
+                    android:drawableStart="@drawable/ic_external_20"
+                    android:drawablePadding="8dp"
+                    android:drawableTint="?attr/clockTextColorDim"
+                    android:text="@string/about_open_update_release" />
+
+            </LinearLayout>
+
+            <LinearLayout
+                style="@style/Widget.Jyutdict.AboutSection"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/about_original_title"
+                    android:textColor="@color/colorPrimary"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="7dp"
+                    android:text="@string/about_original_value"
+                    android:textColor="?attr/clockTextColor"
+                    android:textSize="16sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:text="@string/about_original_summary"
+                    android:textColor="?attr/clockTextColorDim"
+                    android:textSize="13sp" />
+
+                <Button
+                    android:id="@+id/btn_open_original_project"
+                    style="@style/Widget.Jyutdict.LinkButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="40dp"
+                    android:drawableStart="@drawable/ic_external_20"
+                    android:drawablePadding="8dp"
+                    android:drawableTint="?attr/clockTextColorDim"
+                    android:text="@string/about_open_original_project" />
+
+            </LinearLayout>
+
+            <LinearLayout
+                style="@style/Widget.Jyutdict.AboutSection"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/about_content_title"
+                    android:textColor="@color/colorPrimary"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="7dp"
+                    android:text="@string/about_content_value"
+                    android:textColor="?attr/clockTextColor"
+                    android:textSize="16sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:text="@string/about_content_summary"
+                    android:textColor="?attr/clockTextColorDim"
+                    android:textSize="13sp" />
+
+                <Button
+                    android:id="@+id/btn_open_content_site"
+                    style="@style/Widget.Jyutdict.LinkButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="40dp"
+                    android:drawableStart="@drawable/ic_external_20"
+                    android:drawablePadding="8dp"
+                    android:drawableTint="?attr/clockTextColorDim"
+                    android:text="@string/about_open_content_site" />
+
+            </LinearLayout>
+
+            <LinearLayout
+                style="@style/Widget.Jyutdict.AboutSection"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/about_help_title"
+                    android:textColor="@color/colorPrimary"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="7dp"
+                    android:text="@string/about_help_summary"
+                    android:textColor="?attr/clockTextColor"
+                    android:textSize="15sp" />
+
+                <Button
+                    android:id="@+id/btn_open_help"
+                    style="@style/Widget.Jyutdict.LinkButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="40dp"
+                    android:drawableStart="@drawable/ic_external_20"
+                    android:drawablePadding="8dp"
+                    android:drawableTint="?attr/clockTextColorDim"
+                    android:text="@string/about_open_help" />
+
+            </LinearLayout>
+
+        </LinearLayout>
+
+    </ScrollView>
+
+</LinearLayout>

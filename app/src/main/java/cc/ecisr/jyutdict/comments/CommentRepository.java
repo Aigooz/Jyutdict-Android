@@ -1,7 +1,5 @@
 package cc.ecisr.jyutdict.comments;
 
-import android.content.Context;
-
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -21,8 +19,8 @@ public final class CommentRepository {
     public static final String TYPE_SHEET = "sheet";
     private final ApiClient apiClient;
 
-    public CommentRepository(Context context) {
-        apiClient = ApiClient.getInstance(context);
+    public CommentRepository() {
+        apiClient = ApiClient.getInstance();
     }
 
     public void getComments(String type, String target, CommentsCallback callback) {
@@ -42,29 +40,6 @@ public final class CommentRepository {
             }
             callback.onResult(comments, null);
         });
-    }
-
-    public void postComment(String type, String target, String content, Completion callback) {
-        JSONObject body = new JSONObject();
-        try {
-            body.put(TYPE_CHAR.equals(type) ? "chara" : "sheet_key", target);
-            body.put("content", content);
-        } catch (JSONException exception) {
-            callback.onComplete(false, exception.getMessage());
-            return;
-        }
-        apiClient.post(endpoint(type), body, true, completion(callback));
-    }
-
-    public void deleteComment(String type, int commentId, Completion callback) {
-        JSONObject body = new JSONObject();
-        try {
-            body.put("comment_id", commentId);
-        } catch (JSONException exception) {
-            callback.onComplete(false, exception.getMessage());
-            return;
-        }
-        apiClient.delete(endpoint(type), body, completion(callback));
     }
 
     public void getCounts(String type, List<String> targets, CountsCallback callback) {
@@ -92,10 +67,6 @@ public final class CommentRepository {
         });
     }
 
-    private ApiClient.Callback completion(Completion callback) {
-        return (body, error) -> callback.onComplete(error == null, error);
-    }
-
     private String endpoint(String type) {
         if (!TYPE_CHAR.equals(type) && !TYPE_SHEET.equals(type)) {
             throw new IllegalArgumentException("Unknown comment type: " + type);
@@ -117,9 +88,5 @@ public final class CommentRepository {
 
     public interface CountsCallback {
         void onResult(Map<String, Integer> counts, String errorMessage);
-    }
-
-    public interface Completion {
-        void onComplete(boolean success, String errorMessage);
     }
 }

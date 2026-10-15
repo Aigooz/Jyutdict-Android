@@ -1,0 +1,298 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="?attr/clockBackground"
+    android:orientation="vertical"
+    tools:context=".TaishanActivity">
+
+    <androidx.appcompat.widget.Toolbar
+        android:id="@+id/toolbar"
+        style="@style/Widget.Jyutdict.Toolbar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:minHeight="?attr/actionBarSize"
+        app:title="@string/taishan_title" />
+
+    <com.google.android.material.button.MaterialButtonToggleGroup
+        android:id="@+id/taishan_mode_group"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingHorizontal="10dp"
+        android:paddingTop="4dp"
+        android:paddingBottom="2dp"
+        app:selectionRequired="true"
+        app:singleSelection="true">
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/taishan_mode_local"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="0dp"
+            android:layout_height="40dp"
+            android:layout_weight="1"
+            android:text="@string/taishan_mode_local"
+            android:textAllCaps="false"
+            android:textSize="13sp"
+            app:cornerRadius="8dp" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/taishan_mode_online"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="0dp"
+            android:layout_height="40dp"
+            android:layout_weight="1"
+            android:text="@string/taishan_mode_online"
+            android:textAllCaps="false"
+            android:textSize="13sp"
+            app:cornerRadius="8dp" />
+    </com.google.android.material.button.MaterialButtonToggleGroup>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="44dp"
+        android:background="?attr/clockBackground"
+        android:elevation="3dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingHorizontal="10dp"
+        android:paddingVertical="5dp">
+
+        <FrameLayout
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1">
+
+            <androidx.appcompat.widget.AppCompatEditText
+                android:id="@+id/taishan_search_input"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="@drawable/bg_search_field"
+                android:hint="@string/taishan_search_hint"
+                android:imeOptions="actionSearch"
+                android:inputType="text"
+                android:maxLines="1"
+                android:paddingStart="12dp"
+                android:paddingEnd="36dp"
+                android:paddingVertical="0dp"
+                android:singleLine="true"
+                android:textColor="?attr/clockTextColor"
+                android:textColorHint="?attr/clockTextColorDim"
+                android:textSize="15sp"
+                android:theme="@style/MyEditText" />
+
+            <ImageView
+                android:id="@+id/taishan_clear"
+                android:layout_width="32dp"
+                android:layout_height="match_parent"
+                android:layout_gravity="end"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:clickable="true"
+                android:contentDescription="@string/search_clear_description"
+                android:focusable="true"
+                android:gravity="center"
+                android:src="@drawable/ic_close_20"
+                app:tint="?attr/clockTextColorDim"
+                android:visibility="gone" />
+
+        </FrameLayout>
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/taishan_filter"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:layout_marginStart="8dp"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"
+            android:minWidth="0dp"
+            android:paddingHorizontal="10dp"
+            android:text="@string/search_filter_all"
+            android:textAllCaps="false"
+            android:textColor="?attr/clockTextColor"
+            android:textSize="12sp"
+            app:backgroundTint="@android:color/transparent"
+            app:cornerRadius="8dp"
+            app:icon="@drawable/ic_filter_20"
+            app:iconGravity="textStart"
+            app:iconTint="?attr/clockTextColorDim"
+            app:rippleColor="?attr/clockHover"
+            app:strokeColor="?attr/clockHover"
+            app:strokeWidth="1dp" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/taishan_online_options"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:layout_marginStart="6dp"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"
+            android:minWidth="0dp"
+            android:paddingHorizontal="8dp"
+            android:text="@string/taishan_search_field_taishanese"
+            android:textAllCaps="false"
+            android:textColor="?attr/clockTextColor"
+            android:textSize="12sp"
+            android:visibility="gone"
+            app:backgroundTint="@android:color/transparent"
+            app:cornerRadius="8dp"
+            app:icon="@drawable/ic_filter_20"
+            app:iconGravity="textStart"
+            app:iconTint="?attr/clockTextColorDim"
+            app:rippleColor="?attr/clockHover"
+            app:strokeColor="?attr/clockHover"
+            app:strokeWidth="1dp" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/taishan_match_mode"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:layout_marginStart="5dp"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"
+            android:minWidth="0dp"
+            android:paddingHorizontal="8dp"
+            android:text="@string/taishan_search_partial"
+            android:textAllCaps="false"
+            android:textColor="?attr/clockTextColor"
+            android:textSize="12sp"
+            android:visibility="gone"
+            app:backgroundTint="@android:color/transparent"
+            app:cornerRadius="8dp"
+            app:rippleColor="?attr/clockHover"
+            app:strokeColor="?attr/clockHover"
+            app:strokeWidth="1dp" />
+
+    </LinearLayout>
+
+    <FrameLayout
+        android:id="@+id/taishan_state_container"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:background="?attr/clockBackground">
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/taishan_list"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="?attr/clockBackground"
+            android:clipToPadding="false"
+            android:paddingTop="4dp"
+            android:paddingBottom="12dp"
+            android:scrollbars="vertical" />
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/taishan_online_list"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="?attr/clockBackground"
+            android:clipToPadding="false"
+            android:paddingTop="4dp"
+            android:paddingBottom="12dp"
+            android:scrollbars="vertical"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/taishan_online_limit_notice"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="top"
+            android:background="?attr/cardBackground"
+            android:paddingHorizontal="14dp"
+            android:paddingVertical="8dp"
+            android:text="@string/taishan_online_limit_hint"
+            android:textColor="?attr/clockTextColorDim"
+            android:textSize="12sp"
+            android:visibility="gone" />
+
+        <ProgressBar
+            android:id="@+id/taishan_progress"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:indeterminateTint="@color/colorPrimary"
+            android:visibility="gone" />
+
+        <ProgressBar
+            android:id="@+id/taishan_online_progress"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="match_parent"
+            android:layout_height="3dp"
+            android:layout_gravity="top"
+            android:indeterminate="true"
+            android:indeterminateTint="@color/colorPrimary"
+            android:visibility="gone" />
+
+        <Button
+            android:id="@+id/taishan_error"
+            style="@style/ButtonTextColor"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:background="#00000000"
+            android:foreground="?selectableItemBackground"
+            android:padding="16dp"
+            android:text="@string/taishan_load_failed"
+            android:visibility="gone" />
+
+        <Button
+            android:id="@+id/taishan_online_error"
+            style="@style/ButtonTextColor"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:background="#00000000"
+            android:foreground="?selectableItemBackground"
+            android:padding="16dp"
+            android:text="@string/taishan_online_load_failed"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/taishan_online_empty"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:gravity="center"
+            android:padding="24dp"
+            android:text="@string/taishan_online_empty"
+            android:textColor="?attr/clockTextColorDim"
+            android:textSize="15sp"
+            android:visibility="gone" />
+
+        <LinearLayout
+            android:id="@+id/taishan_empty"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="?attr/clockBackground"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:padding="24dp"
+            android:visibility="gone">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:text="@string/taishan_empty_title"
+                android:textColor="?attr/clockTextColor"
+                android:textSize="19sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:gravity="center"
+                android:text="@string/taishan_empty_description"
+                android:textColor="?attr/clockTextColorDim"
+                android:textSize="14sp" />
+
+        </LinearLayout>
+
+    </FrameLayout>
+
+</LinearLayout>

@@ -1,0 +1,25 @@
+<resources>
+    <string-array name="language_mode_entries">
+        <item>跟随系统</item>
+        <item>简体中文</item>
+        <item>繁体中文</item>
+    </string-array>
+
+    <string-array name="language_mode_values">
+        <item>system</item>
+        <item>zh-CN</item>
+        <item>zh-TW</item>
+    </string-array>
+
+    <string-array name="theme_mode_entries">
+        <item>跟随系统</item>
+        <item>白天模式</item>
+        <item>夜间模式</item>
+    </string-array>
+
+    <string-array name="theme_mode_values">
+        <item>follow_system</item>
+        <item>light</item>
+        <item>dark</item>
+    </string-array>
+</resources>

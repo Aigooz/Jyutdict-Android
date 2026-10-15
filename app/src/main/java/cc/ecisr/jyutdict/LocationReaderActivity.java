@@ -14,6 +14,7 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import cc.ecisr.jyutdict.utils.ApiUrlBuilder;
+import cc.ecisr.jyutdict.utils.ChineseTextConverter;
 import cc.ecisr.jyutdict.databinding.ActivityLocationReaderBinding;
 import cc.ecisr.jyutdict.utils.DiskTextCache;
 import cc.ecisr.jyutdict.utils.HttpUtil;
@@ -24,7 +25,7 @@ import cc.ecisr.jyutdict.utils.PhonologyHtmlRenderer;
 import cc.ecisr.jyutdict.utils.ThemeUtil;
 
 /** 地點介紹與程序音系表共用的只讀頁。 */
-public class LocationReaderActivity extends AppCompatActivity {
+public class LocationReaderActivity extends LocalizedActivity {
     private static final String URL_API_BASE = "https://jyutdict.org/api/v1.0/";
     private static final String EXTRA_MODE = "mode";
     private static final String EXTRA_LOCATION_ID = "location_id";
@@ -80,8 +81,10 @@ public class LocationReaderActivity extends AppCompatActivity {
             getSupportActionBar().setDisplayHomeAsUpEnabled(true);
             getSupportActionBar().setTitle(
                     MODE_PHONOLOGY.equals(mode)
-                            ? getString(R.string.location_phonology_title, locationName)
-                            : getString(R.string.location_article_title, locationName)
+                            ? getString(R.string.location_phonology_title,
+                                    ChineseTextConverter.display(locationName))
+                            : getString(R.string.location_article_title,
+                                    ChineseTextConverter.display(locationName))
             );
         }
 
@@ -187,6 +190,7 @@ public class LocationReaderActivity extends AppCompatActivity {
                         "https://jyutdict.org/",
                         ThemeUtil.isNightMode(this)
                 );
+                html = ChineseTextConverter.display(html);
             }
             binding.readerWebView.loadDataWithBaseURL(
                     "https://jyutdict.org/",

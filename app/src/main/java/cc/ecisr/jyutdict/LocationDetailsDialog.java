@@ -16,6 +16,7 @@ import androidx.appcompat.app.AlertDialog;
 import cc.ecisr.jyutdict.databinding.DialogLocationInfoBinding;
 import cc.ecisr.jyutdict.struct.LocationInfo;
 import cc.ecisr.jyutdict.utils.ColorUtil;
+import cc.ecisr.jyutdict.utils.ChineseTextConverter;
 import cc.ecisr.jyutdict.utils.LocationArticleRepository;
 import cc.ecisr.jyutdict.utils.MotionUtil;
 
@@ -79,7 +80,7 @@ public final class LocationDetailsDialog {
                 if (result.redirected()) {
                     MotionUtil.setText(binding.locationRedirect, context.getString(
                             R.string.location_article_redirected,
-                            result.resolvedName
+                            ChineseTextConverter.display(result.resolvedName)
                     ));
                     binding.locationRedirect.setVisibility(View.VISIBLE);
                 } else {
@@ -125,7 +126,7 @@ public final class LocationDetailsDialog {
                                        View metadataAccent,
                                        Button phonology) {
         if (location == null) {
-            MotionUtil.setText(title, fallbackName);
+            MotionUtil.setText(title, ChineseTextConverter.display(fallbackName));
             MotionUtil.setText(metadata, context.getString(R.string.location_no_metadata));
             metadataAccent.setBackground(ColorUtil.locationColorDrawable(
                     null,
@@ -144,7 +145,7 @@ public final class LocationDetailsDialog {
         ));
         MotionUtil.setText(metadata, location.sheetInfo.isEmpty()
                 ? context.getString(R.string.location_no_metadata)
-                : location.sheetInfo);
+                : ChineseTextConverter.display(location.sheetInfo));
         phonology.setEnabled(location.hasPhonology);
         MotionUtil.setText(phonology, context.getString(location.hasPhonology
                 ? R.string.location_phonology

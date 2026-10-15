@@ -4,22 +4,43 @@
     android:id="@+id/list_item"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginHorizontal="8dp"
-    android:layout_marginTop="4dp"
-    android:layout_marginBottom="2dp"
-    android:background="?attr/clockBackground"
+    android:layout_marginHorizontal="10dp"
+    android:layout_marginTop="6dp"
+    android:layout_marginBottom="4dp"
+    android:background="@drawable/bg_card_ripple"
     android:elevation="2dp"
     android:orientation="vertical"
-    android:padding="8dp">
+    android:paddingHorizontal="12dp"
+    android:paddingVertical="10dp">
 
-    <cc.ecisr.jyutdict.widget.SelectableTextView
-        android:id="@+id/content_location"
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:includeFontPadding="false"
-        android:lineSpacingExtra="1dp"
-        android:text="@string/result_list_bottom"
-        android:textColor="?attr/clockTextColor"
-        android:textSize="13sp" />
+        android:orientation="horizontal">
+
+        <cc.ecisr.jyutdict.widget.SelectableTextView
+            android:id="@+id/content_location"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:includeFontPadding="false"
+            android:fontFamily="serif"
+            android:lineSpacingExtra="2dp"
+            android:text="@string/result_list_bottom"
+            android:textColor="?attr/clockTextColor"
+            android:textSize="13sp" />
+
+        <include layout="@layout/pronunciation_control" />
+
+        <androidx.appcompat.widget.AppCompatImageButton
+            android:id="@+id/result_favorite"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/records_favorite_add"
+            android:padding="12dp"
+            android:src="@drawable/ic_bookmark_24" />
+
+    </LinearLayout>
 
 </LinearLayout>

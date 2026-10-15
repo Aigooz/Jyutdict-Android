@@ -44,6 +44,44 @@
             android:textSize="13sp"
             android:textStyle="bold" />
 
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/version_update_action"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:background="@drawable/bg_solid_accent_button"
+                android:foreground="?selectableItemBackground"
+                android:minHeight="0dp"
+                android:minWidth="0dp"
+                android:paddingHorizontal="14dp"
+                android:text="@string/version_update_action"
+                android:textColor="@color/btn_solid_accent_text"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:visibility="gone" />
+
+            <Button
+                android:id="@+id/version_background_action"
+                style="@style/ButtonTextColor"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:layout_marginStart="8dp"
+                android:background="#00000000"
+                android:foreground="?selectableItemBackground"
+                android:minHeight="0dp"
+                android:minWidth="0dp"
+                android:paddingHorizontal="14dp"
+                android:text="@string/version_update_background"
+                android:textSize="13sp"
+                android:visibility="gone" />
+
+        </LinearLayout>
+
         <View
             android:layout_width="match_parent"
             android:layout_height="1dp"
@@ -59,37 +97,14 @@
             android:textSize="12sp" />
 
         <Button
-            android:id="@+id/version_download_baidu"
-            style="@style/ButtonTextColor"
-            android:layout_width="match_parent"
-            android:layout_height="40dp"
-            android:background="#00000000"
-            android:foreground="?selectableItemBackground"
-            android:gravity="start|center_vertical"
-            android:paddingHorizontal="4dp"
-            android:text="@string/version_download_baidu"
-            android:textColor="?attr/clockTextColor"
-            android:textSize="13sp" />
-
-        <Button
-            android:id="@+id/version_download_tianyi"
-            style="@style/ButtonTextColor"
-            android:layout_width="match_parent"
-            android:layout_height="40dp"
-            android:background="#00000000"
-            android:foreground="?selectableItemBackground"
-            android:gravity="start|center_vertical"
-            android:paddingHorizontal="4dp"
-            android:text="@string/version_download_tianyi"
-            android:textColor="?attr/clockTextColor"
-            android:textSize="13sp" />
-
-        <Button
             android:id="@+id/version_download_github"
             style="@style/ButtonTextColor"
             android:layout_width="match_parent"
             android:layout_height="40dp"
             android:background="#00000000"
+            android:drawableStart="@drawable/ic_external_20"
+            android:drawablePadding="8dp"
+            android:drawableTint="?attr/clockTextColorDim"
             android:foreground="?selectableItemBackground"
             android:gravity="start|center_vertical"
             android:paddingHorizontal="4dp"

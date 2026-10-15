@@ -4,10 +4,10 @@
     android:id="@+id/list_item"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginHorizontal="8dp"
-    android:layout_marginTop="4dp"
-    android:layout_marginBottom="2dp"
-    android:background="?attr/clockBackground"
+    android:layout_marginHorizontal="10dp"
+    android:layout_marginTop="6dp"
+    android:layout_marginBottom="4dp"
+    android:background="@drawable/bg_card_ripple"
     android:elevation="2dp"
     android:orientation="vertical">
 
@@ -16,7 +16,8 @@
         android:layout_height="wrap_content"
         android:baselineAligned="false"
         android:orientation="horizontal"
-        android:padding="8dp">
+        android:paddingHorizontal="12dp"
+        android:paddingVertical="10dp">
 
         <LinearLayout
             android:id="@+id/item_chara"
@@ -30,8 +31,10 @@
 
             <cc.ecisr.jyutdict.widget.SelectableTextView
                 android:id="@+id/chara_header"
-                android:layout_width="match_parent"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:maxWidth="96dp"
+                android:fontFamily="serif"
                 android:gravity="center"
                 android:includeFontPadding="false"
                 android:text="@string/result_list_chara"
@@ -40,8 +43,9 @@
 
             <cc.ecisr.jyutdict.widget.SelectableTextView
                 android:id="@+id/chara_info"
-                android:layout_width="match_parent"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:maxWidth="96dp"
                 android:layout_marginTop="2dp"
                 android:gravity="center"
                 android:text="@string/result_list_info"
@@ -51,7 +55,7 @@
 
             <cc.ecisr.jyutdict.widget.SelectableTextView
                 android:id="@+id/chara_extra"
-                android:layout_width="match_parent"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"
                 android:maxWidth="70dp"
@@ -98,16 +102,27 @@
 
         </LinearLayout>
 
+        <include layout="@layout/pronunciation_control" />
+
+        <androidx.appcompat.widget.AppCompatImageButton
+            android:id="@+id/result_favorite"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/records_favorite_add"
+            android:padding="12dp"
+            android:src="@drawable/ic_bookmark_24" />
+
     </LinearLayout>
 
     <LinearLayout
         android:id="@+id/sheet_annotation_container"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginStart="8dp"
-        android:layout_marginEnd="8dp"
-        android:layout_marginBottom="8dp"
-        android:background="?attr/clockHover"
+        android:layout_marginStart="12dp"
+        android:layout_marginEnd="12dp"
+        android:layout_marginBottom="10dp"
+        android:background="@drawable/bg_annotation_box"
         android:clickable="true"
         android:focusable="true"
         android:foreground="?attr/selectableItemBackground"

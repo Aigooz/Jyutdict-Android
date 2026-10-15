@@ -8,6 +8,7 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.text.InputType;
 import android.view.ViewGroup;
+import android.widget.ProgressBar;
 
 import androidx.activity.OnBackPressedCallback;
 import androidx.appcompat.app.AlertDialog;
@@ -19,37 +20,40 @@ import androidx.preference.Preference;
 import androidx.preference.PreferenceFragmentCompat;
 import androidx.preference.SwitchPreferenceCompat;
 
-import org.json.JSONArray;
-import org.json.JSONObject;
-
 import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import cc.ecisr.jyutdict.auth.AuthRepository;
-import cc.ecisr.jyutdict.auth.GoogleSignInCoordinator;
 import cc.ecisr.jyutdict.databinding.ActivitySettingsBinding;
 import cc.ecisr.jyutdict.databinding.DialogVersionInfoBinding;
+import cc.ecisr.jyutdict.databinding.DialogVersionProgressBinding;
 import cc.ecisr.jyutdict.utils.DiskTextCache;
-import cc.ecisr.jyutdict.utils.HttpUtil;
 import cc.ecisr.jyutdict.utils.LocationArticleRepository;
 import cc.ecisr.jyutdict.utils.ImmersiveBarUtil;
 import cc.ecisr.jyutdict.utils.MotionUtil;
 import cc.ecisr.jyutdict.utils.ThemeUtil;
 import cc.ecisr.jyutdict.utils.ToastUtil;
+import cc.ecisr.jyutdict.update.AppUpdateClient;
+import cc.ecisr.jyutdict.update.BackgroundUpdateWorker;
+import cc.ecisr.jyutdict.update.UpdateDownloader;
+import cc.ecisr.jyutdict.update.UpdateManager;
+import cc.ecisr.jyutdict.update.UpdateSettings;
 
-public class SettingsActivity extends AppCompatActivity {
+public class SettingsActivity extends LocalizedActivity {
     private static final String EXTRA_THEME_CHANGED = "theme_changed";
     private static final String EXTRA_THEME_TRANSITION = "theme_transition";
+    private static final String EXTRA_LANGUAGE_CHANGED = "language_changed";
+    public static final String EXTRA_SHOW_UPDATE_DIALOG = "show_update_dialog";
     private static final String SETTINGS_FRAGMENT_TAG = "settings_fragment";
     private static final Pattern SEMANTIC_VERSION_PATTERN = Pattern.compile(
             "^(\\d+)\\.(\\d+)\\.(\\d+)(?:[-+].*)?$");
 
     DialogVersionInfoBinding versionDialogBinding;
     AlertDialog versionDialog;
-    final HttpUtil versionQuery = new HttpUtil();
-    AuthRepository authRepository;
-    GoogleSignInCoordinator googleSignIn;
+    DialogVersionProgressBinding versionProgressDialogBinding;
+    AlertDialog versionProgressDialog;
+    UpdateDownloader.DownloadHandle downloadHandle;
+    AppUpdateClient.ReleaseInfo selectedUpdate;
 
     String versionNameThis;
     int[] currentVersion;
@@ -73,8 +77,6 @@ public class SettingsActivity extends AppCompatActivity {
         setSupportActionBar(binding.toolbar);
         ImmersiveBarUtil.applyToolbarInsets(binding.toolbar);
         ImmersiveBarUtil.applyBottomInsets(binding.getRoot());
-        authRepository = AuthRepository.getInstance(this);
-        googleSignIn = new GoogleSignInCoordinator(this);
         androidx.fragment.app.Fragment restoredFragment = getSupportFragmentManager()
                 .findFragmentByTag(SETTINGS_FRAGMENT_TAG);
         if (restoredFragment instanceof SettingsFragment) {
@@ -86,9 +88,6 @@ public class SettingsActivity extends AppCompatActivity {
                     .replace(R.id.settings, settingsFragment, SETTINGS_FRAGMENT_TAG)
                     .commitNow();
         }
-        authRepository.initialize((success, errorMessage) -> {
-            if (settingsFragment.isAdded()) settingsFragment.refreshAccountPreference();
-        });
         getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
             @Override
             public void handleOnBackPressed() {
@@ -103,12 +102,17 @@ public class SettingsActivity extends AppCompatActivity {
 
         versionNameThis = getInstalledVersionName();
         currentVersion = parseSemanticVersion(versionNameThis);
+        UpdateManager.schedulePeriodicCheck(this);
 
+        if (getIntent().getBooleanExtra(EXTRA_SHOW_UPDATE_DIALOG, false)) {
+            getIntent().removeExtra(EXTRA_SHOW_UPDATE_DIALOG);
+            binding.btnCheckVersion.post(this::showVersionDialog);
+        }
 
         binding.btnCheckVersion.setText(getString(R.string.app_version, versionNameThis));
         binding.btnCheckVersion.setOnClickListener(v -> showVersionDialog());
         binding.btnAbout.setOnClickListener(v ->
-                startActivity(new Intent(this, InfoActivity.class)));
+                startActivity(new Intent(this, AboutActivity.class)));
     }
 
     private void showVersionDialog() {
@@ -117,12 +121,13 @@ public class SettingsActivity extends AppCompatActivity {
         versionDialogBinding.versionCurrent.setText(getString(
                 R.string.version_current_value, versionNameThis));
         versionDialogBinding.versionCheckAction.setOnClickListener(view -> checkVersion());
-        versionDialogBinding.versionDownloadBaidu.setOnClickListener(view ->
-                openUrl("https://pan.baidu.com/s/1r7mo35tEwZ0zAjQHIacf8w"));
-        versionDialogBinding.versionDownloadTianyi.setOnClickListener(view ->
-                openUrl("https://cloud.189.cn/t/yA7FVnUzQZj2"));
+        versionDialogBinding.versionUpdateAction.setOnClickListener(view -> downloadSelectedUpdate());
+        versionDialogBinding.versionBackgroundAction.setOnClickListener(
+                view -> downloadSelectedInBackground());
+        versionDialogBinding.versionUpdateAction.setVisibility(android.view.View.GONE);
+        versionDialogBinding.versionBackgroundAction.setVisibility(android.view.View.GONE);
         versionDialogBinding.versionDownloadGithub.setOnClickListener(view ->
-                openUrl("https://github.com/EcRal5t/Jyutdict-Android/releases"));
+                openUrl("https://github.com/" + BuildConfig.UPDATE_REPO + "/releases/latest"));
 
         versionDialog = new AlertDialog.Builder(this)
                 .setTitle(R.string.version_dialog_title)
@@ -134,61 +139,148 @@ public class SettingsActivity extends AppCompatActivity {
             versionDialogBinding = null;
         });
         versionDialog.show();
-    }
-
-    private void showAccountDialog() {
-        AuthRepository.User user = authRepository.getCurrentUser();
-        if (user == null) {
-            googleSignIn.signIn(settingsFragment::refreshAccountPreference);
-            return;
-        }
-
-        String message = user.email + "\n" + getString(R.string.auth_role, user.role);
-        new AlertDialog.Builder(this)
-                .setTitle(user.displayName())
-                .setMessage(message)
-                .setPositiveButton(R.string.button_confirm, null)
-                .setNegativeButton(R.string.auth_sign_out, (dialog, which) ->
-                        googleSignIn.signOut(settingsFragment::refreshAccountPreference))
-                .show();
+        checkVersion();
     }
 
     private void checkVersion() {
         setVersionStatus(getString(R.string.version_status_checking));
         setVersionCheckEnabled(false);
-        versionQuery.enqueue("https://jyutdict.org/api/", new HttpUtil.Callback() {
-            @Override
-            public void onSuccess(String body) {
-                applyVersionResponse(body);
-            }
-
-            @Override
-            public void onFailure(HttpUtil.RequestError error) {
-                setVersionStatus(getString(R.string.version_status_failed));
-                setVersionCheckEnabled(true);
-            }
-        });
+        AppUpdateClient.fetchLatestRelease(this, this::applyUpdateResult);
     }
 
-    private void applyVersionResponse(String raw) {
-        try {
-            JSONObject response = new JSONObject(raw);
-            JSONArray version = response.optJSONArray("app_version");
-            if (version == null) version = response.getJSONArray("version");
-            int major = version.getInt(0), minor = version.getInt(1), patch = version.getInt(2);
-            setVersionStatus(isNewerVersion(major, minor, patch)
-                    ? getString(R.string.version_status_update_available, major, minor, patch)
-                    : getString(R.string.version_status_current));
-        } catch (Exception ignored) {
-            setVersionStatus(getString(R.string.version_status_invalid));
+    private void applyUpdateResult(AppUpdateClient.UpdateResult result) {
+        if (versionDialogBinding == null) return;
+        if (result.message() != null) {
+            selectedUpdate = null;
+            versionDialogBinding.versionUpdateAction.setVisibility(android.view.View.GONE);
+            setVersionStatus(result.message());
+            setVersionCheckEnabled(true);
+            return;
         }
+        selectedUpdate = result.release();
+        boolean hasUsableAsset = result.hasUpdate() && selectedUpdate != null
+                && selectedUpdate.hasAsset();
+        boolean downloaded = hasUsableAsset
+                && UpdateDownloader.isDownloaded(this, selectedUpdate);
+        boolean showForegroundUpdate = hasUsableAsset;
+        versionDialogBinding.versionUpdateAction.setVisibility(
+                showForegroundUpdate ? android.view.View.VISIBLE : android.view.View.GONE);
+        versionDialogBinding.versionBackgroundAction.setVisibility(
+                hasUsableAsset && !downloaded ? android.view.View.VISIBLE : android.view.View.GONE);
+        setVersionStatus(result.hasUpdate()
+                ? getString(R.string.version_status_build_available,
+                        selectedUpdate != null ? selectedUpdate.tagName() : "")
+                : getString(R.string.version_status_current));
         setVersionCheckEnabled(true);
     }
 
-    private boolean isNewerVersion(int major, int minor, int patch) {
-        if (major != currentVersion[0]) return major > currentVersion[0];
-        if (minor != currentVersion[1]) return minor > currentVersion[1];
-        return patch > currentVersion[2];
+    private void downloadSelectedInBackground() {
+        if (selectedUpdate == null || !selectedUpdate.hasAsset()) return;
+        if (UpdateDownloader.isDownloaded(this, selectedUpdate)) {
+            ToastUtil.msg(this, getString(R.string.version_background_already_downloaded));
+            return;
+        }
+        BackgroundUpdateWorker.enqueue(this, selectedUpdate);
+        if (versionDialog != null) versionDialog.dismiss();
+        ToastUtil.msg(this, getString(R.string.version_background_started));
+    }
+
+    private void downloadSelectedUpdate() {
+        if (selectedUpdate == null || !selectedUpdate.hasAsset() || downloadHandle != null) return;
+        setVersionStatus(getString(R.string.version_download_started));
+        setVersionCheckEnabled(false);
+        versionDialogBinding.versionUpdateAction.setEnabled(false);
+        showDownloadProgressDialog();
+        downloadHandle = UpdateDownloader.downloadAndInstall(this, selectedUpdate,
+                new UpdateDownloader.ProgressCallback() {
+                    @Override
+                    public void onProgress(int percent, long downloadedBytes, long totalBytes) {
+                        if (versionProgressDialogBinding == null) return;
+                        ProgressBar progressBar = versionProgressDialogBinding.versionProgressBar;
+                        if (totalBytes > 0) {
+                            progressBar.setIndeterminate(false);
+                            progressBar.setMax(100);
+                            progressBar.setProgress(Math.max(0, percent));
+                            versionProgressDialogBinding.versionProgressDetail.setText(getString(
+                                    R.string.version_download_size_progress,
+                                    formatBytes(downloadedBytes),
+                                    formatBytes(totalBytes)));
+                            versionProgressDialogBinding.versionProgressPercent
+                                    .setText(percent + "%");
+                        } else {
+                            progressBar.setIndeterminate(true);
+                            versionProgressDialogBinding.versionProgressDetail.setText(getString(
+                                    R.string.version_download_bytes,
+                                    formatBytes(downloadedBytes)));
+                            versionProgressDialogBinding.versionProgressPercent.setText("--");
+                        }
+                    }
+
+                    @Override
+                    public void onComplete(boolean success, String message) {
+                        downloadHandle = null;
+                        hideDownloadProgressDialog();
+                        if (versionDialogBinding != null) {
+                            versionDialogBinding.versionUpdateAction.setEnabled(true);
+                            setVersionCheckEnabled(success);
+                            if (success) {
+                                setVersionStatus(getString(R.string.version_download_complete));
+                            } else if (message != null
+                                    && message.equals(getString(R.string.version_download_cancelled))) {
+                                setVersionStatus(getString(R.string.version_download_cancelled));
+                            } else {
+                                setVersionStatus(getString(
+                                        R.string.version_download_failed,
+                                        message == null ? "" : message));
+                            }
+                        } else if (!success) {
+                            ToastUtil.msg(SettingsActivity.this, message == null
+                                    ? getString(R.string.version_status_failed)
+                                    : message);
+                        }
+                    }
+                });
+    }
+
+    private void showDownloadProgressDialog() {
+        if (versionProgressDialog != null && versionProgressDialog.isShowing()) return;
+        versionProgressDialogBinding = DialogVersionProgressBinding.inflate(getLayoutInflater());
+        versionProgressDialogBinding.versionProgressCancel.setOnClickListener(view -> {
+            if (downloadHandle != null) downloadHandle.cancel();
+            if (versionProgressDialog != null) versionProgressDialog.dismiss();
+        });
+        versionProgressDialog = new AlertDialog.Builder(this)
+                .setView(versionProgressDialogBinding.getRoot())
+                .setCancelable(true)
+                .create();
+        versionProgressDialog.setOnDismissListener(dialog -> {
+            if (downloadHandle != null) downloadHandle.cancel();
+        });
+        versionProgressDialog.show();
+        if (versionProgressDialog.getWindow() != null) {
+            versionProgressDialog.getWindow().setBackgroundDrawable(
+                    new android.graphics.drawable.ColorDrawable(
+                            android.graphics.Color.TRANSPARENT));
+        }
+    }
+
+    private void hideDownloadProgressDialog() {
+        if (versionProgressDialog != null) {
+            versionProgressDialog.setOnDismissListener(null);
+            versionProgressDialog.dismiss();
+        }
+        versionProgressDialog = null;
+        versionProgressDialogBinding = null;
+    }
+
+    private String formatBytes(long value) {
+        if (value < 1024) return value + " B";
+        double size = value / 1024.0;
+        if (size < 1024) return String.format(java.util.Locale.US, "%.1f KB", size);
+        size /= 1024.0;
+        if (size < 1024) return String.format(java.util.Locale.US, "%.1f MB", size);
+        size /= 1024.0;
+        return String.format(java.util.Locale.US, "%.2f GB", size);
     }
 
     private String getInstalledVersionName() {
@@ -240,7 +332,6 @@ public class SettingsActivity extends AppCompatActivity {
 
     @Override
     protected void onDestroy() {
-        versionQuery.cancel();
         if (versionDialog != null) versionDialog.dismiss();
         super.onDestroy();
     }
@@ -254,8 +345,8 @@ public class SettingsActivity extends AppCompatActivity {
         SwitchPreferenceCompat switchLongPressLocationCard;
         ListPreference listThemeMode;
         SwitchPreferenceCompat switchIpaPresent;
+        ListPreference listLanguageMode;
         Preference clearCache;
-        Preference account;
 
         @Override
         public void onCreatePreferences(Bundle savedInstanceState, String rootKey) {
@@ -267,16 +358,29 @@ public class SettingsActivity extends AppCompatActivity {
             switchLongPressLocationCard = findPreference("long_press_location_card");
             editAreaColoringDarkenRatio = findPreference("area_coloring_darken_ratio");
             listThemeMode = findPreference("theme_mode");
+            listLanguageMode = findPreference("app_locale");
             switchIpaPresent = findPreference("ipa_presence");
             clearCache = findPreference("clear_cache");
-            account = findPreference("account");
-
-            if (account != null) {
-                account.setOnPreferenceClickListener(preference -> {
-                    ((SettingsActivity) requireActivity()).showAccountDialog();
+            UpdateSettings.clearLegacyToken(requireContext());
+            Preference publicUpdates = findPreference("public_update_source");
+            if (publicUpdates != null) {
+                publicUpdates.setOnPreferenceClickListener(preference -> {
+                    startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(
+                            "https://github.com/" + BuildConfig.UPDATE_REPO + "/releases/latest")));
                     return true;
                 });
-                refreshAccountPreference();
+            }
+
+            if (listLanguageMode != null) {
+                listLanguageMode.setOnPreferenceChangeListener((preference, newValue) -> {
+                    preferences().edit()
+                            .putString("app_locale", String.valueOf(newValue))
+                            .apply();
+                    requireActivity().getIntent()
+                            .putExtra(EXTRA_LANGUAGE_CHANGED, true);
+                    requireActivity().recreate();
+                    return false;
+                });
             }
 
             if (editAreaColoringDarkenRatio != null) {
@@ -315,19 +419,6 @@ public class SettingsActivity extends AppCompatActivity {
             }
         }
 
-        void refreshAccountPreference() {
-            if (account == null || !isAdded()) return;
-            AuthRepository.User user = AuthRepository.getInstance(requireContext())
-                    .getCurrentUser();
-            if (user == null) {
-                account.setTitle(R.string.auth_sign_in);
-                account.setSummary(R.string.auth_account_summary);
-            } else {
-                account.setTitle(getString(R.string.auth_signed_in_as, user.displayName()));
-                account.setSummary(R.string.auth_account_summary);
-            }
-        }
-
         int saveSettings() {
             SharedPreferences preferences = preferences();
             SharedPreferences.Editor editor = preferences.edit();
@@ -337,6 +428,9 @@ public class SettingsActivity extends AppCompatActivity {
             boolean themeChanged = requireActivity().getIntent()
                     .getBooleanExtra(EXTRA_THEME_CHANGED, false);
             settings |= themeChanged || !newThemeMode.equals(oldThemeMode) ? 1 << 1 : 0;
+            if (requireActivity().getIntent().getBooleanExtra(EXTRA_LANGUAGE_CHANGED, false)) {
+                settings |= 1 << 2;
+            }
 
             editor.putBoolean("advanced_search", switchAdvancedSearch.isChecked());
             editor.putBoolean("area_coloring", switchAreaColoring.isChecked());

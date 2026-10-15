@@ -3,7 +3,6 @@ package cc.ecisr.jyutdict.comments;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.Button;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
@@ -15,23 +14,16 @@ import java.util.ArrayList;
 import java.util.List;
 
 import cc.ecisr.jyutdict.R;
-import cc.ecisr.jyutdict.auth.AuthRepository;
 
 final class CommentAdapter extends RecyclerView.Adapter<CommentAdapter.ViewHolder> {
     private final ArrayList<Comment> comments = new ArrayList<>();
-    private final DeleteListener deleteListener;
-    private AuthRepository.User currentUser;
-    private boolean isAdmin;
 
-    CommentAdapter(DeleteListener deleteListener) {
-        this.deleteListener = deleteListener;
+    CommentAdapter() {
         setHasStableIds(true);
     }
 
-    void submit(List<Comment> values, AuthRepository.User user, boolean admin) {
+    void submit(List<Comment> values) {
         ArrayList<Comment> previous = new ArrayList<>(comments);
-        AuthRepository.User previousUser = currentUser;
-        boolean previousAdmin = isAdmin;
         ArrayList<Comment> updated = new ArrayList<>(values);
         DiffUtil.DiffResult diff = DiffUtil.calculateDiff(new DiffUtil.Callback() {
             @Override
@@ -53,15 +45,11 @@ final class CommentAdapter extends RecyclerView.Adapter<CommentAdapter.ViewHolde
             public boolean areContentsTheSame(int oldPosition, int newPosition) {
                 Comment oldComment = previous.get(oldPosition);
                 Comment newComment = updated.get(newPosition);
-                return sameContent(oldComment, newComment)
-                        && canDelete(oldComment, previousUser, previousAdmin)
-                        == canDelete(newComment, user, admin);
+                return sameContent(oldComment, newComment);
             }
         });
         comments.clear();
         comments.addAll(updated);
-        currentUser = user;
-        isAdmin = admin;
         diff.dispatchUpdatesTo(this);
     }
 
@@ -74,10 +62,6 @@ final class CommentAdapter extends RecyclerView.Adapter<CommentAdapter.ViewHolde
                 && left.nickname.equals(right.nickname)
                 && left.email.equals(right.email)
                 && left.role.equals(right.role);
-    }
-
-    private static boolean canDelete(Comment comment, AuthRepository.User user, boolean admin) {
-        return !comment.deleted && (admin || user != null && comment.userId == user.id);
     }
 
     int activeCount() {
@@ -99,10 +83,9 @@ final class CommentAdapter extends RecyclerView.Adapter<CommentAdapter.ViewHolde
         if (comment.deleted) {
             holder.author.setText(R.string.comment_deleted);
             holder.meta.setText("");
-            holder.content.setText("");
-            holder.content.setVisibility(View.GONE);
-            holder.delete.setVisibility(View.GONE);
-            return;
+        holder.content.setText("");
+        holder.content.setVisibility(View.GONE);
+        return;
         }
 
         holder.author.setText(comment.displayName());
@@ -112,9 +95,6 @@ final class CommentAdapter extends RecyclerView.Adapter<CommentAdapter.ViewHolde
                 comment.content.replace("\n", "<br>"),
                 HtmlCompat.FROM_HTML_MODE_LEGACY));
         holder.content.setVisibility(View.VISIBLE);
-        boolean ownComment = currentUser != null && comment.userId == currentUser.id;
-        holder.delete.setVisibility(ownComment || isAdmin ? View.VISIBLE : View.GONE);
-        holder.delete.setOnClickListener(view -> deleteListener.onDelete(comment));
     }
 
     @Override
@@ -130,19 +110,13 @@ final class CommentAdapter extends RecyclerView.Adapter<CommentAdapter.ViewHolde
     static final class ViewHolder extends RecyclerView.ViewHolder {
         final TextView author;
         final TextView meta;
-        final TextView content;
-        final Button delete;
+    final TextView content;
 
         ViewHolder(@NonNull View itemView) {
             super(itemView);
             author = itemView.findViewById(R.id.comment_author);
             meta = itemView.findViewById(R.id.comment_meta);
             content = itemView.findViewById(R.id.comment_content);
-            delete = itemView.findViewById(R.id.comment_delete);
         }
-    }
-
-    interface DeleteListener {
-        void onDelete(Comment comment);
     }
 }

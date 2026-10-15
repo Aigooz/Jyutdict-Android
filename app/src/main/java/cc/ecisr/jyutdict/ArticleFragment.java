@@ -26,6 +26,7 @@ import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 
 import cc.ecisr.jyutdict.utils.ApiUrlBuilder;
+import cc.ecisr.jyutdict.utils.ChineseTextConverter;
 import cc.ecisr.jyutdict.databinding.FragmentArticleBinding;
 import cc.ecisr.jyutdict.utils.DiskTextCache;
 import cc.ecisr.jyutdict.utils.HttpUtil;
@@ -134,12 +135,13 @@ public class ArticleFragment extends Fragment {
         if (getActivity() == null || webView == null) return;
         try (InputStream input = getActivity().getAssets().open("info/info.html");
              BufferedReader reader = new BufferedReader(
-                     new InputStreamReader(input, StandardCharsets.UTF_16BE))) {
-            StringBuilder html = new StringBuilder();
+                     new InputStreamReader(input, StandardCharsets.UTF_8))) {
+            StringBuilder source = new StringBuilder();
             String line;
             while ((line = reader.readLine()) != null) {
-                html.append(line).append('\n');
+                source.append(line).append('\n');
             }
+            StringBuilder html = new StringBuilder(ChineseTextConverter.display(source.toString()));
             if (ThemeUtil.isNightMode(getActivity())) {
                 html.insert(
                         html.indexOf("</style>"),
@@ -214,6 +216,9 @@ public class ArticleFragment extends Fragment {
             case "tone":
                 fileName = "tone.md";
                 break;
+            case "ipa":
+                fileName = "ipa.md";
+                break;
             default:
                 return false;
         }
@@ -272,7 +277,8 @@ public class ArticleFragment extends Fragment {
         if (getActivity() == null || webView == null) return;
 
         boolean isDarkMode = ThemeUtil.isNightMode(getActivity());
-        String html = MarkdownUtil.toHtml(markdown, imagesBase, isDarkMode);
+        String html = MarkdownUtil.toHtml(
+                ChineseTextConverter.display(markdown), imagesBase, isDarkMode);
         webView.loadDataWithBaseURL(imagesBase, html, "text/html", "UTF-8", null);
 
         MotionUtil.showOnly(stateContainer, webView, progressBar, errorText, webView);

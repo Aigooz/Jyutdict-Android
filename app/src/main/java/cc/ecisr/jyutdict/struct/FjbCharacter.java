@@ -17,9 +17,15 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.List;
 
 import cc.ecisr.jyutdict.utils.ColorUtil;
+import cc.ecisr.jyutdict.utils.ChineseTextConverter;
 import cc.ecisr.jyutdict.utils.StringUtil;
+import cc.ecisr.jyutdict.utils.JyutpingAudioCatalog;
+import cc.ecisr.jyutdict.utils.PronunciationOption;
+import cc.ecisr.jyutdict.utils.PronunciationSequence;
+import cc.ecisr.jyutdict.widget.PronunciationClickSpan;
 import cc.ecisr.jyutdict.widget.AnnotationClickSpan;
 import cc.ecisr.jyutdict.widget.DashedUnderlineSpan;
 import cc.ecisr.jyutdict.widget.GradientTextSpan;
@@ -32,9 +38,15 @@ public class FjbCharacter {
     private final Map<String, String> values = new HashMap<>();
     private final EntrySetting settings;
     private JSONObject cellNotes;
+    private final JyutpingAudioCatalog audioCatalog;
 
     public FjbCharacter(JSONObject entry, EntrySetting settings) {
+        this(entry, settings, null);
+    }
+
+    public FjbCharacter(JSONObject entry, EntrySetting settings, JyutpingAudioCatalog audioCatalog) {
         this.settings = settings;
+        this.audioCatalog = audioCatalog;
         Iterator<String> keys = entry.keys();
         while (keys.hasNext()) {
             String key = keys.next();
@@ -43,6 +55,29 @@ public class FjbCharacter {
         try {
             cellNotes = new JSONObject(value(FjbHeaderInfo.COLUMN_NAME_CELL_NOTE));
         } catch (JSONException ignored) {}
+    }
+
+    public List<PronunciationOption> pronunciationOptions() {
+        ArrayList<PronunciationOption> result = new ArrayList<>();
+        addPronunciationOptions(result, "", value(FjbHeaderInfo.COLUMN_NAME_PRONUNCIATION));
+        for (String key : FjbHeaderInfo.getCityListInShort()) {
+            String[] name = FjbHeaderInfo.getFullName(key);
+            addPronunciationOptions(result, ChineseTextConverter.display(name[0] + name[1]), value(key));
+        }
+        return result;
+    }
+
+    private void addPronunciationOptions(List<PronunciationOption> result, String label, String value) {
+        for (String reading : PronunciationSequence.alternatives(value)) {
+            if (isPlayable(reading)) {
+                PronunciationOption option = new PronunciationOption(label, reading);
+                if (!result.contains(option)) result.add(option);
+            }
+        }
+    }
+
+    private boolean isPlayable(String reading) {
+        return audioCatalog != null && !audioCatalog.resolveSequence(reading).isEmpty();
     }
 
     public Spanned printMeanings() {
@@ -91,7 +126,7 @@ public class FjbCharacter {
             html.append(ENTER);
         }
         if (!original.isEmpty()) html.delete(html.length() - ENTER.length(), html.length());
-        return Html.fromHtml(html.toString());
+        return Html.fromHtml(ChineseTextConverter.display(html.toString()));
     }
 
     public Spanned printLocations() {
@@ -121,8 +156,9 @@ public class FjbCharacter {
             String minor = value(FjbHeaderInfo.COLUMN_NAME_CLASS_MINOR);
             if (!secondary.isEmpty()) classes.append("\n").append(secondary);
             if (!minor.isEmpty()) classes.append("\n").append(minor);
+            String classText = ChineseTextConverter.display(classes.toString());
             int start = text.length();
-            text.append("\n\n").append(classes);
+            text.append("\n\n").append(classText);
             span(text, new ForegroundColorSpan(Color.parseColor("#BBBBBB")),
                     start + 2, text.length());
         }
@@ -133,11 +169,12 @@ public class FjbCharacter {
         String pronunciation = value(key);
         if (pronunciation.isEmpty()) return;
         String[] fullName = FjbHeaderInfo.getFullName(key);
-        String displayName = fullName[0] + fullName[1];
+        String rawName = fullName[0] + fullName[1];
+        String displayName = ChineseTextConverter.display(rawName);
         int itemStart = text.length();
         text.append(displayName).append(": ");
         int nameEnd = itemStart + displayName.length();
-        span(text, new LocationClickSpan(displayName), itemStart, text.length());
+        span(text, new LocationClickSpan(rawName), itemStart, text.length());
         int styleStart = itemStart;
         if (settings.isAreaColoring) {
             span(text, new GradientTextSpan(tinted(FjbHeaderInfo.getCityColors(key))),
@@ -162,8 +199,9 @@ public class FjbCharacter {
 
     private void appendForeign(SpannableStringBuilder text, String key, String pronunciation) {
         int itemStart = text.length();
-        text.append(key).append(": ");
-        int nameEnd = itemStart + key.length();
+        String displayName = ChineseTextConverter.display(key);
+        text.append(displayName).append(": ");
+        int nameEnd = itemStart + displayName.length();
         int styleStart = itemStart;
         if (settings.isAreaColoring) {
             span(text, new GradientTextSpan(tinted(FjbHeaderInfo.getForeignColors(key))),
@@ -199,10 +237,12 @@ public class FjbCharacter {
                            int start, int end, ArrayList<String> colors) {
         String note = cellNotes == null ? "" : cellNotes.optString(key);
         if (note.isEmpty()) return;
+        String convertedNote = ChineseTextConverter.display(
+                note.replaceAll("\n\t-.+", "\t\t- by Anonymous")
+                        .replaceAll("\n-{10,}", ""));
         String message = ">「" + value(FjbHeaderInfo.COLUMN_NAME_CHARACTER) + "」("
                 + value(FjbHeaderInfo.COLUMN_NAME_PRONUNCIATION) + ")   [" + key + "] "
-                + pronunciation + ", \n" + note.replaceAll("\n\t-.+", "\t\t- by Anonymous")
-                .replaceAll("\n-{10,}", "");
+                + pronunciation + ", \n" + convertedNote;
         span(text, new AnnotationClickSpan(message), start, end);
         int[] underline = settings.isAreaColoring
                 ? tinted(colors) : new int[]{Color.parseColor("#999999")};
@@ -252,7 +292,11 @@ public class FjbCharacter {
         SpannableStringBuilder text = new SpannableStringBuilder();
         for (int index = 0; index < pronunciations.length; index++) {
             if (index > 0) text.append(index % 2 == 0 ? "/\n" : "/");
+            int start = text.length();
             text.append(pronunciations[index]);
+            if (isPlayable(pronunciations[index])) {
+                span(text, new PronunciationClickSpan(pronunciations[index]), start, text.length());
+            }
         }
         if (text.toString().contains("?")) {
             span(text, new StyleSpan(Typeface.ITALIC), 0, text.length());

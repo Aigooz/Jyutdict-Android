@@ -2,23 +2,26 @@
 <resources>
     <!-- 主色調：經典朱紅 -->
     <color name="colorPrimary">#D32913</color>
+    <color name="colorPrimaryDarkTheme">#FF8A7A</color>
     <color name="colorPrimaryDark">#A22C29</color>
     <color name="colorAccent">#721121</color>
     <color name="colorSecondary">#721121</color>
     <color name="colorSecondaryVariant">#530C18</color>
 
-    <!-- 亮色主題中性色（徹底摒棄偏綠色相，使用純淨高級的中性灰） -->
-    <color name="colorBackground">#FAFAFA</color>
-    <color name="colorHover">#ECEBF0</color>
-    <color name="colorUnavailable">#D0CFD8</color>
-    <color name="colorUnavailableText">#9594A0</color>
-    <color name="colorGray">#3D3C46</color>
-    <color name="colorBlack">#121215</color>
+    <!-- 亮色主題中性色：暖紙色，與網頁端 #F4F4EE 對齊 -->
+    <color name="colorBackground">#F4F4EE</color>
+    <color name="colorHover">#E9E8DF</color>
+    <color name="cardBackground">#FFFFFF</color>
+    <color name="colorUnavailable">#D9D7CD</color>
+    <color name="colorUnavailableText">#9A988E</color>
+    <color name="colorGray">#43413B</color>
+    <color name="colorBlack">#14130E</color>
     <color name="colorWhite">#FFFFFF</color>
 
     <!-- 暗色主題中性色 -->
     <color name="colorBackgroundDark">#1E1E22</color>
     <color name="colorHoverDark">#2F2F37</color>
+    <color name="cardBackgroundDark">#26262B</color>
     <color name="colorUnavailableDark">#44434D</color>
     <color name="colorGrayDark">#9E9CA8</color>
 

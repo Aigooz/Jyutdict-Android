@@ -9,6 +9,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import cc.ecisr.jyutdict.utils.ColorUtil;
+import cc.ecisr.jyutdict.utils.ChineseTextConverter;
 
 /** Parsed sheet columns and their display metadata. */
 public final class FjbHeaderInfo {
@@ -111,7 +112,7 @@ public final class FjbHeaderInfo {
         String[] result = new String[cityList.size()];
         for (int index = 0; index < result.length; index++) {
             String[] name = fullNames.get(cityList.get(index));
-            result[index] = name == null ? "" : name[0] + name[1];
+            result[index] = name == null ? "" : ChineseTextConverter.display(name[0] + name[1]);
         }
         return result;
     }

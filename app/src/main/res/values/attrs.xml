@@ -1,9 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <attr name="clockBackground" format="color"/>
+    <attr name="cardBackground" format="color"/>
     <attr name="clockHover" format="color"/>
     <attr name="clockTextColor" format="color"/>
     <attr name="clockTextColorDim" format="color"/>
+    <attr name="clockAccentColor" format="color"/>
     <attr name="btnSolidAccentBorder" format="color"/>
     <attr name="btnSolidAccentPressedBorder" format="color"/>
     <attr name="btnSolidSecondaryBorder" format="color"/>

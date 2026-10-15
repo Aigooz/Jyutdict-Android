@@ -10,9 +10,11 @@
         <item name="colorSurface">@color/colorBackground</item>
         <item name="colorOnSurface">@color/colorBlack</item>
         <item name="clockBackground">@color/colorBackground</item>
+        <item name="cardBackground">@color/cardBackground</item>
         <item name="clockHover">@color/colorHover</item>
         <item name="clockTextColor">@color/colorBlack</item>
         <item name="clockTextColorDim">@color/colorGray</item>
+        <item name="clockAccentColor">@color/colorPrimary</item>
         <item name="btnSolidAccentBorder">@color/btnSolidAccentBorderLight</item>
         <item name="btnSolidAccentPressedBorder">@color/btnSolidAccentPressedBorderLight</item>
         <item name="btnSolidSecondaryBorder">@color/btnSolidSecondaryBorderLight</item>
@@ -40,9 +42,11 @@
         <item name="colorSurface">@color/colorBackgroundDark</item>
         <item name="colorOnSurface">@color/colorHover</item>
         <item name="clockBackground">@color/colorBackgroundDark</item>
+        <item name="cardBackground">@color/cardBackgroundDark</item>
         <item name="clockHover">@color/colorHoverDark</item>
         <item name="clockTextColor">@color/colorHover</item>
         <item name="clockTextColorDim">@color/colorGrayDark</item>
+        <item name="clockAccentColor">@color/colorPrimaryDarkTheme</item>
         <item name="btnSolidAccentBorder">@color/btnSolidAccentBorderDark</item>
         <item name="btnSolidAccentPressedBorder">@color/btnSolidAccentPressedBorderDark</item>
         <item name="btnSolidSecondaryBorder">@color/btnSolidSecondaryBorderDark</item>
@@ -72,9 +76,11 @@
         <item name="android:windowBackground">@color/colorBackgroundDark</item>
         <item name="android:colorBackground">@color/colorBackgroundDark</item>
         <item name="clockBackground">@color/colorBackgroundDark</item>
+        <item name="cardBackground">@color/cardBackgroundDark</item>
         <item name="clockHover">@color/colorHoverDark</item>
         <item name="clockTextColor">@color/colorHover</item>
         <item name="clockTextColorDim">@color/colorGrayDark</item>
+        <item name="clockAccentColor">@color/colorPrimaryDarkTheme</item>
         <item name="btnSolidAccentBorder">@color/btnSolidAccentBorderDark</item>
         <item name="btnSolidAccentPressedBorder">@color/btnSolidAccentPressedBorderDark</item>
         <item name="btnSolidSecondaryBorder">@color/btnSolidSecondaryBorderDark</item>
@@ -99,9 +105,11 @@
         <item name="colorOnSurface">@color/colorBlack</item>
         <item name="android:windowBackground">@color/colorBackground</item>
         <item name="clockBackground">@color/colorBackground</item>
+        <item name="cardBackground">@color/cardBackground</item>
         <item name="clockHover">@color/colorHover</item>
         <item name="clockTextColor">@color/colorBlack</item>
         <item name="clockTextColorDim">@color/colorGray</item>
+        <item name="clockAccentColor">@color/colorPrimary</item>
         <item name="btnSolidAccentBorder">@color/btnSolidAccentBorderLight</item>
         <item name="btnSolidAccentPressedBorder">@color/btnSolidAccentPressedBorderLight</item>
         <item name="btnSolidSecondaryBorder">@color/btnSolidSecondaryBorderLight</item>
@@ -125,9 +133,11 @@
         <item name="android:textColorPrimary">@color/colorHover</item>
         <item name="android:textColorSecondary">@color/colorGrayDark</item>
         <item name="clockBackground">@color/colorBackgroundDark</item>
+        <item name="cardBackground">@color/cardBackgroundDark</item>
         <item name="clockHover">@color/colorHoverDark</item>
         <item name="clockTextColor">@color/colorHover</item>
         <item name="clockTextColorDim">@color/colorGrayDark</item>
+        <item name="clockAccentColor">@color/colorPrimaryDarkTheme</item>
         <item name="btnSolidAccentBorder">@color/btnSolidAccentBorderDark</item>
         <item name="btnSolidAccentPressedBorder">@color/btnSolidAccentPressedBorderDark</item>
         <item name="btnSolidSecondaryBorder">@color/btnSolidSecondaryBorderDark</item>
@@ -147,7 +157,40 @@
     </style>
 
     <style name="ShapeAppearance.Jyutdict.Straight" parent="ShapeAppearance.MaterialComponents">
-        <item name="cornerSize">0dp</item>
+        <item name="cornerSize">8dp</item>
+    </style>
+
+    <style name="Widget.Jyutdict.Toolbar" parent="Widget.AppCompat.Toolbar">
+        <item name="android:background">@color/colorPrimary</item>
+        <item name="android:elevation">2dp</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
+        <item name="titleTextColor">@color/colorWhite</item>
+    </style>
+
+    <style name="Widget.Jyutdict.PreferenceCard" parent="Widget.MaterialComponents.CardView">
+        <item name="android:clickable">false</item>
+        <item name="android:focusable">false</item>
+        <item name="cardBackgroundColor">?attr/cardBackground</item>
+        <item name="cardCornerRadius">8dp</item>
+        <item name="cardElevation">0dp</item>
+        <item name="rippleColor">@android:color/transparent</item>
+        <item name="strokeWidth">0dp</item>
+    </style>
+
+    <style name="Widget.Jyutdict.AboutSection" parent="">
+        <item name="android:background">@drawable/bg_card_ripple</item>
+        <item name="android:orientation">vertical</item>
+        <item name="android:padding">16dp</item>
+    </style>
+
+    <style name="Widget.Jyutdict.LinkButton" parent="@style/ButtonTextColor">
+        <item name="android:background">#00000000</item>
+        <item name="android:foreground">?selectableItemBackground</item>
+        <item name="android:gravity">start|center_vertical</item>
+        <item name="android:paddingHorizontal">4dp</item>
+        <item name="android:textColor">@color/colorPrimary</item>
+        <item name="android:textAllCaps">false</item>
+        <item name="android:textSize">13sp</item>
     </style>
 
     <style name="Animation.Jyutdict.Activity" parent="@android:style/Animation.Activity">

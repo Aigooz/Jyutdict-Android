@@ -12,8 +12,8 @@ import cc.ecisr.jyutdict.databinding.ActivityInfoBinding;
 import cc.ecisr.jyutdict.utils.ImmersiveBarUtil;
 import cc.ecisr.jyutdict.utils.ThemeUtil;
 
-/** 伺服器三篇說明文章的只讀分頁；正文由 ArticleFragment 半持久化快取。 */
-public class InfoActivity extends AppCompatActivity {
+/** 伺服器說明文章的只讀分頁；正文由 ArticleFragment 半持久化快取。 */
+public class InfoActivity extends LocalizedActivity {
     private String[] articleTitles;
     private TabLayoutMediator tabMediator;
 
@@ -33,9 +33,12 @@ public class InfoActivity extends AppCompatActivity {
         }
 
         articleTitles = new String[]{getString(R.string.info_bundled_title),
-                "泛粵典", "擴展粵拼", "聲調總表"};
+                getString(R.string.info_tab_fanwan),
+                getString(R.string.info_tab_jpp),
+                getString(R.string.info_tab_tone),
+                getString(R.string.info_tab_ipa)};
         ArticlePagerAdapter pagerAdapter = new ArticlePagerAdapter(this,
-                new String[]{ArticleFragment.BUNDLED_INFO_ID, "intro", "jpp", "tone"});
+                new String[]{ArticleFragment.BUNDLED_INFO_ID, "intro", "jpp", "tone", "ipa"});
         binding.viewPager.setAdapter(pagerAdapter);
         binding.viewPager.setUserInputEnabled(true);
         binding.progressBar.setVisibility(View.GONE);

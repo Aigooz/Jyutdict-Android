@@ -10,13 +10,11 @@
 
     <androidx.appcompat.widget.Toolbar
         android:id="@+id/tool_bar"
+        style="@style/Widget.Jyutdict.Toolbar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:minHeight="?attr/actionBarSize"
-        android:background="@color/colorPrimary"
-        android:elevation="4dp"
-        app:title="@string/app_name"
-        app:titleTextColor="@color/colorWhite" />
+        app:title="@string/app_name" />
 
     <androidx.constraintlayout.widget.ConstraintLayout
         android:layout_width="match_parent"
@@ -55,27 +53,27 @@
                         android:layout_height="match_parent"
                         android:layout_weight="1">
 
-                        <androidx.appcompat.widget.AppCompatEditText
-                            android:id="@+id/edit_text_input"
-                            android:layout_width="match_parent"
-                            android:layout_height="match_parent"
-                            android:backgroundTint="@color/colorPrimary"
-                            android:ems="10"
-                            android:hint="@string/search_tips"
-                            android:imeActionLabel="@string/search_button"
-                            android:imeOptions="actionSearch"
-                            android:inputType="text"
-                            android:maxLines="1"
-                            android:paddingStart="8dp"
-                            android:paddingEnd="36dp"
-                            android:paddingVertical="0dp"
-                            android:singleLine="true"
-                            android:textColor="?attr/clockTextColor"
-                            android:textColorHint="?attr/clockTextColorDim"
-                            android:textSize="16sp"
-                            android:theme="@style/MyEditText" />
+                    <androidx.appcompat.widget.AppCompatEditText
+                        android:id="@+id/edit_text_input"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:background="@drawable/bg_search_field"
+                        android:ems="10"
+                        android:hint="@string/search_tips"
+                        android:imeActionLabel="@string/search_button"
+                        android:imeOptions="actionSearch"
+                        android:inputType="text"
+                        android:maxLines="1"
+                        android:paddingStart="12dp"
+                        android:paddingEnd="40dp"
+                        android:paddingVertical="0dp"
+                        android:singleLine="true"
+                        android:textColor="?attr/clockTextColor"
+                        android:textColorHint="?attr/clockTextColorDim"
+                        android:textSize="15sp"
+                        android:theme="@style/MyEditText" />
 
-                        <TextView
+                        <ImageView
                             android:id="@+id/btn_clear_input"
                             android:layout_width="36dp"
                             android:layout_height="match_parent"
@@ -85,9 +83,8 @@
                             android:contentDescription="@string/search_clear_description"
                             android:focusable="true"
                             android:gravity="center"
-                            android:text="@string/search_clear"
-                            android:textColor="?attr/clockTextColorDim"
-                            android:textSize="18sp"
+                            android:src="@drawable/ic_close_20"
+                            app:tint="?attr/clockTextColorDim"
                             android:visibility="gone" />
 
                     </FrameLayout>
@@ -95,13 +92,14 @@
                     <Button
                         android:id="@+id/btn_query"
                         android:layout_width="wrap_content"
-                        android:layout_height="34dp"
-                        android:layout_marginStart="6dp"
+                        android:layout_height="38dp"
+                        android:layout_marginStart="8dp"
+                        android:minWidth="72dp"
                         android:background="@drawable/bg_solid_accent_button"
                         android:foreground="?selectableItemBackground"
+                        android:textSize="16sp"
                         android:text="@string/search_button"
                         android:textColor="@color/btn_solid_accent_text"
-                        android:textSize="18sp"
                         android:textStyle="bold" />
 
                 </LinearLayout>
@@ -119,6 +117,8 @@
                         android:layout_width="196dp"
                         android:layout_height="match_parent"
                         android:checkedButton="@id/btn_common_sheet"
+                        android:background="@drawable/bg_segment_group"
+                        android:padding="2dp"
                         android:gravity="center_vertical"
                         android:orientation="horizontal">
 
@@ -127,16 +127,16 @@
                             android:layout_width="0dp"
                             android:layout_height="match_parent"
                             android:layout_weight="1"
-                            android:buttonTint="@color/btn_mode_radio_tint"
-                            android:gravity="center_vertical"
+                            android:background="@drawable/bg_segment_left"
+                            android:button="@null"
+                            android:gravity="center"
+                            android:paddingHorizontal="8dp"
                             android:minHeight="0dp"
                             android:minWidth="0dp"
-                            android:paddingStart="0dp"
-                            android:paddingEnd="2dp"
                             android:singleLine="true"
                             android:text="@string/search_common_sheet"
                             android:textAllCaps="false"
-                            android:textColor="@color/btn_mode_radio_tint"
+                            android:textColor="@color/btn_segment_text"
                             android:textSize="12sp" />
 
                         <RadioButton
@@ -144,16 +144,16 @@
                             android:layout_width="0dp"
                             android:layout_height="match_parent"
                             android:layout_weight="1"
-                            android:buttonTint="@color/btn_mode_radio_tint"
-                            android:gravity="center_vertical"
+                            android:background="@drawable/bg_segment_right"
+                            android:button="@null"
+                            android:gravity="center"
+                            android:paddingHorizontal="8dp"
                             android:minHeight="0dp"
                             android:minWidth="0dp"
-                            android:paddingStart="0dp"
-                            android:paddingEnd="0dp"
                             android:singleLine="true"
                             android:text="@string/search_jyut_sheet"
                             android:textAllCaps="false"
-                            android:textColor="@color/btn_mode_radio_tint"
+                            android:textColor="@color/btn_segment_text"
                             android:textSize="12sp" />
 
                     </RadioGroup>
@@ -174,7 +174,7 @@
                         android:textSize="12sp"
                         android:visibility="gone"
                         app:backgroundTint="@color/btn_toggle_chip_bg"
-                        app:cornerRadius="0dp"
+                        app:cornerRadius="20dp"
                         app:elevation="0dp" />
 
                 </LinearLayout>
@@ -251,7 +251,7 @@
                             android:textColor="@color/btn_toggle_chip_text"
                             android:textSize="12sp"
                             app:backgroundTint="@color/btn_toggle_chip_bg"
-                            app:cornerRadius="0dp"
+                            app:cornerRadius="20dp"
                             app:elevation="0dp" />
 
                     </LinearLayout>
@@ -272,6 +272,10 @@
                         android:layout_height="36dp"
                         android:layout_weight="1"
                         android:background="#00000000"
+                        android:drawableStart="@drawable/ic_filter_20"
+                        android:drawablePadding="4dp"
+                        android:drawableTint="?attr/clockTextColorDim"
+                        android:gravity="center"
                         android:foreground="?selectableItemBackground"
                         android:text="@string/search_filtering_area"
                         android:textSize="12sp" />
@@ -283,6 +287,10 @@
                         android:layout_height="36dp"
                         android:layout_weight="1"
                         android:background="#00000000"
+                        android:drawableStart="@drawable/ic_filter_20"
+                        android:drawablePadding="4dp"
+                        android:drawableTint="?attr/clockTextColorDim"
+                        android:gravity="center"
                         android:foreground="?selectableItemBackground"
                         android:text="@string/search_filtering_area_pron"
                         android:textSize="12sp"
@@ -295,6 +303,10 @@
                         android:layout_height="36dp"
                         android:layout_weight="1"
                         android:background="#00000000"
+                        android:drawableStart="@drawable/ic_highlight_20"
+                        android:drawablePadding="4dp"
+                        android:drawableTint="?attr/clockTextColorDim"
+                        android:gravity="center"
                         android:foreground="?selectableItemBackground"
                         android:text="@string/search_coloring_jpp_partial"
                         android:textSize="12sp" />

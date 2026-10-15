@@ -4,6 +4,7 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 
 import cc.ecisr.jyutdict.utils.JyutpingUtil;
@@ -113,6 +114,15 @@ public class GeneralCharacter {
                 areas.add(loc);
                 city2index.put(loc.city, areas.size() - 1);
             }
+        }
+
+        // Backend area arrays follow record ID order, which scatters newer dialect
+        // points among older ones. Keep points distinct, but display them together.
+        Collections.sort(areas, (left, right) -> LocationInfo.compareGeographically(
+                LocationInfo.get(left.id), LocationInfo.get(right.id)));
+        city2index.clear();
+        for (int index = 0; index < areas.size(); index++) {
+            city2index.putIfAbsent(areas.get(index).city, index);
         }
 
         // ===== 解析韻書（格式不變）=====

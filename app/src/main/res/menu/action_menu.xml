@@ -5,6 +5,18 @@
     tools:ignore="AlwaysShowAction">
 
     <item
+        android:id="@+id/menu_taishan"
+        android:title="@string/menu_taishan"
+        android:icon="@drawable/ic_book_20"
+        app:showAsAction="always">
+    </item>
+    <item
+        android:id="@+id/menu_records"
+        android:title="@string/menu_records"
+        android:icon="@drawable/ic_bookmark_24"
+        app:showAsAction="always">
+    </item>
+    <item
         android:id="@+id/menu_info"
         android:title="@string/menu_info"
         android:icon="@drawable/ic_about"

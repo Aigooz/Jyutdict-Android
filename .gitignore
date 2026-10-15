@@ -6,4 +6,11 @@ local.properties
 build/
 .claude/
 .vscode/
-/*.md
+build.log
+.claude/
+.vscode/
+*.keystore
+*.jks
+.env
+.env.*
+app/src/main/assets/taishan-dictionary.v1.json

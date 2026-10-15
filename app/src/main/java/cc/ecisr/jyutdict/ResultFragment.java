@@ -6,18 +6,22 @@ import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.text.Spanned;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.Button;
+import android.widget.LinearLayout;
+import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
-import androidx.appcompat.app.AlertDialog;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -29,13 +33,13 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import cc.ecisr.jyutdict.comments.CommentDialogFragment;
 import cc.ecisr.jyutdict.comments.CommentRepository;
 import cc.ecisr.jyutdict.databinding.FragmentResultBinding;
-import cc.ecisr.jyutdict.databinding.LayoutCopyAlertdialogBinding;
+import cc.ecisr.jyutdict.search.DictionaryRecordStore;
 import cc.ecisr.jyutdict.struct.LocationInfo;
 import android.text.SpannableStringBuilder;
 
@@ -44,26 +48,39 @@ import cc.ecisr.jyutdict.struct.FjbHeaderInfo;
 import cc.ecisr.jyutdict.struct.EntrySetting;
 import cc.ecisr.jyutdict.struct.GeneralCharacterManager;
 import cc.ecisr.jyutdict.utils.ColorUtil;
+import cc.ecisr.jyutdict.utils.ChineseTextConverter;
 import cc.ecisr.jyutdict.utils.ImmersiveBarUtil;
+import cc.ecisr.jyutdict.utils.JyutpingAudioCatalog;
+import cc.ecisr.jyutdict.utils.PronunciationPlayer;
 import cc.ecisr.jyutdict.utils.MotionUtil;
 import cc.ecisr.jyutdict.utils.ThemeUtil;
-import cc.ecisr.jyutdict.utils.ToastUtil;
 import cc.ecisr.jyutdict.widget.LocationClickSpan;
 import cc.ecisr.jyutdict.widget.LocationLabelSpan;
 
 public class ResultFragment extends Fragment {
-    private static final String TAG = "`ResultFragment";
-    private static final Pattern WORD_PATTERN = Pattern.compile(
-            "((?<=〔[～~])[^～~]+?(?=〕))|((?<=〔)[^～~]+?(?=[～~]+?〕))");
+    public interface ResultCountListener {
+        void onResultCount(int count);
+    }
+
+    private static final String TAG = "ResultFragment";
 
     private RecyclerView mRvMain;
     private FragmentResultBinding binding;
+    private LinearLayout emptyState;
+    private TextView emptyStateTitle;
+    private TextView emptyStateText;
+    private Button emptyStateAction;
     private ResultItemAdapter resultAdapter;
     private boolean resultRevealRunning;
     private CommentRepository commentRepository;
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    private final ExecutorService parseExecutor = Executors.newSingleThreadExecutor();
+    private long parseToken;
 
     private String rawReceivedData;
     int receivedMode = QUERYING_CHARA;
+    private DictionaryRecordStore recordStore;
+    @Nullable private ResultCountListener resultCountListener;
     public static HashSet<String> pronCityFilter = new HashSet<>();
     public static HashSet<String> pronBookFilter = new HashSet<>();
 
@@ -74,9 +91,18 @@ public class ResultFragment extends Fragment {
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
         binding = FragmentResultBinding.inflate(inflater, container, false);
         mRvMain = binding.resultList;
+        emptyState = binding.emptyState;
+        emptyStateTitle = binding.emptyStateTitle;
+        emptyStateText = binding.emptyStateText;
+        emptyStateAction = binding.emptyStateAction;
+        emptyStateAction.setOnClickListener(v -> {
+            if (getActivity() instanceof MainActivity) {
+                ((MainActivity) getActivity()).retrySearch();
+            }
+        });
         ImmersiveBarUtil.applyBottomInsets(mRvMain);
-        commentRepository = new CommentRepository(requireContext());
-        resultAdapter = new ResultItemAdapter(this::showItemMenu);
+        commentRepository = new CommentRepository();
+        resultAdapter = new ResultItemAdapter();
         mRvMain.setLayoutManager(new LinearLayoutManager(getActivity(), LinearLayoutManager.VERTICAL, false));
         mRvMain.setItemAnimator(null);
         mRvMain.setAdapter(resultAdapter);
@@ -85,47 +111,11 @@ public class ResultFragment extends Fragment {
             receivedMode = savedInstanceState.getInt("received_mode");
         }
         if (rawReceivedData != null && !rawReceivedData.isEmpty()) refreshResult();
+        else showEmptyState(
+                R.string.result_initial_title,
+                R.string.result_initial_description,
+                false);
         return binding.getRoot();
-    }
-
-    private void showItemMenu(ResultItemAdapter.LinearViewHolder holder) {
-        ArrayList<String> choices = new ArrayList<>();
-        ArrayList<String> characters = new ArrayList<>();
-        choices.add(getString(R.string.entry_menu_copy_chara));
-        Matcher matcher = WORD_PATTERN.matcher(holder.getWanshyuText());
-        while (matcher.find()) {
-            String character = matcher.group();
-            characters.add(character);
-            choices.add(getString(R.string.entry_menu_search_common, character));
-            choices.add(getString(R.string.entry_menu_search_special, character));
-        }
-
-        ResultItemAdapter.ResultInfo.CommentTarget comment = holder.getCommentTarget();
-        int commentIndex = -1;
-        if (comment != null && !comment.target.isEmpty()) {
-            commentIndex = choices.size();
-            choices.add(comment.countLoaded
-                    ? getString(R.string.comment_button_count, comment.count)
-                    : getString(R.string.comment_button));
-        }
-        MainActivity activity = (MainActivity) getActivity();
-        if (activity == null) return;
-        int finalCommentIndex = commentIndex;
-        new AlertDialog.Builder(activity).setItems(choices.toArray(new String[0]), (dialog, index) -> {
-            if (index == 0) {
-                LayoutCopyAlertdialogBinding copy =
-                        LayoutCopyAlertdialogBinding.inflate(getLayoutInflater());
-                copy.dialogBoxTv.setText(holder.printContent());
-                new AlertDialog.Builder(activity).setView(copy.getRoot())
-                        .setPositiveButton(R.string.button_confirm, null).show();
-            } else if (index == finalCommentIndex) {
-                CommentDialogFragment.newInstance(comment.type, comment.target, holder.getChara())
-                        .show(getParentFragmentManager(), "comments");
-            } else {
-                activity.search(characters.get((index - 1) >> 1),
-                        index % 2 == 1 ? QUERYING_CHARA : QUERYING_SHEET);
-            }
-        }).show();
     }
 
     @Override
@@ -153,9 +143,18 @@ public class ResultFragment extends Fragment {
         if (rawReceivedData==null || rawReceivedData.isEmpty()) return;
         try {
             parseJson(rawReceivedData, receivedMode, false);
-        } catch (JSONException e) {
-            e.printStackTrace();
+        } catch (JSONException exception) {
+            Log.e(TAG, "Unable to schedule saved result parsing", exception);
         }
+    }
+
+    public void setResultCountListener(@Nullable ResultCountListener listener) {
+        resultCountListener = listener;
+    }
+
+    public void configureRecords(DictionaryRecordStore store, int mode) {
+        recordStore = store;
+        if (resultAdapter != null) resultAdapter.configureRecords(store, mode);
     }
     public void refreshResult(int receivedModeConfig) {
         receivedMode = (receivedMode&QUERYING_MODE_MASK) | receivedModeConfig;
@@ -164,6 +163,7 @@ public class ResultFragment extends Fragment {
 
     public void beginLoading() {
         if (mRvMain == null) return;
+        if (emptyState != null) emptyState.setVisibility(View.GONE);
         resultRevealRunning = false;
         MotionUtil.fadeTo(mRvMain, 0.55f);
     }
@@ -180,14 +180,28 @@ public class ResultFragment extends Fragment {
 
     @Override
     public void onDestroyView() {
+        ++parseToken;
         if (mRvMain != null) {
             mRvMain.animate().cancel();
             mRvMain.setAdapter(null);
         }
+        if (resultAdapter != null) resultAdapter.dispose();
         resultAdapter = null;
         mRvMain = null;
+        emptyState = null;
+        emptyStateTitle = null;
+        emptyStateText = null;
+        emptyStateAction = null;
         binding = null;
         super.onDestroyView();
+    }
+
+    @Override
+    public void onDestroy() {
+        ++parseToken;
+        parseExecutor.shutdownNow();
+        mainHandler.removeCallbacksAndMessages(null);
+        super.onDestroy();
     }
 
     /**
@@ -207,22 +221,54 @@ public class ResultFragment extends Fragment {
 
     private void parseJson(String jsonString, int queryObjectWhat, boolean revealNewResult)
             throws JSONException {
-        if (getActivity()==null) return;
-        if (resultAdapter == null) return;
-
-        ArrayList<ResultItemAdapter.ResultInfo> parsedItems =
-                parseJsonValidated(jsonString, queryObjectWhat);
-        resultAdapter.replaceItems(parsedItems);
+        if (jsonString == null || jsonString.isEmpty() || resultAdapter == null) return;
+        Context context = getContext();
+        if (context == null) return;
+        PronunciationPlayer.stop();
+        final long token = ++parseToken;
         rawReceivedData = jsonString;
         receivedMode = queryObjectWhat;
-        publishResultViews(revealNewResult);
-        loadCommentCounts();
+        if (resultAdapter != null) resultAdapter.configureRecords(recordStore, queryObjectWhat);
+        parseExecutor.execute(() -> {
+            try {
+                ArrayList<ResultItemAdapter.ResultInfo> parsedItems =
+                        parseJsonValidated(jsonString, queryObjectWhat,
+                                context.getApplicationContext());
+                mainHandler.post(() -> {
+                    if (token != parseToken || !isAdded() || resultAdapter == null
+                            || getView() == null) return;
+                    resultAdapter.replaceItems(parsedItems);
+                    publishResultViews(revealNewResult);
+                    loadCommentCounts();
+                    if (resultCountListener != null) {
+                        resultCountListener.onResultCount(parsedItems.size());
+                    }
+                });
+            } catch (JSONException | RuntimeException exception) {
+                Log.e(TAG, "Unable to parse result", exception);
+                mainHandler.post(() -> {
+                    if (token == parseToken && isAdded() && emptyState != null) {
+                        showParseError();
+                    }
+                });
+            }
+        });
+    }
+
+    public void showParseError() {
+        if (emptyState == null) return;
+        showEmptyState(R.string.result_error_title, R.string.result_error_data, true);
+    }
+
+    public void showNetworkError() {
+        if (emptyState == null) return;
+        showEmptyState(R.string.result_error_title, R.string.result_error_network, true);
     }
 
     private ArrayList<ResultItemAdapter.ResultInfo> parseJsonValidated(
-            String jsonString, int queryObjectWhat) throws JSONException {
+            String jsonString, int queryObjectWhat, Context context) throws JSONException {
 
-        SharedPreferences sp = getActivity().getSharedPreferences("settings", Context.MODE_PRIVATE);
+        SharedPreferences sp = context.getSharedPreferences("settings", Context.MODE_PRIVATE);
         ArrayList<ResultItemAdapter.ResultInfo> parsedItems = new ArrayList<>();
         EntrySetting entrySettings = new EntrySetting()
                 .setAreaColoringInfo(
@@ -230,32 +276,35 @@ public class ResultFragment extends Fragment {
                         sp.getFloat("area_coloring_darken_ratio", 0.92f))
                 .setMeaningDomainPresence(
                         sp.getBoolean("phrase_meaning_domain", false))
-                .setUsingNightMode(ThemeUtil.isNightMode(getActivity()))
+                .setUsingNightMode(ThemeUtil.isNightMode(context))
                 .setPresentIpa(sp.getBoolean("ipa_presence", true));
         switch (queryObjectWhat & QUERYING_MODE_MASK) {
             case QUERYING_CHARA:
                 GeneralCharacterManager gcm = new GeneralCharacterManager();
                 gcm.parse(jsonString, entrySettings); /// 為什麼要重新解析一次原始字符串？真傻
                 gcm.retrieveInfo();
+                GeneralCharacterManager.initAudioCatalog(context);
                 gcm.coloring(queryObjectWhat & DISPLAY_CHECKING_MASK);
                 for (int i = 0; i<gcm.length(); i++) {
                     Spanned[] spanneds = gcm.printChara(i);
-                    addItem(parsedItems, spanneds[0], spanneds[1], spanneds[2],
+                    ResultItemAdapter.ResultInfo item = addItem(parsedItems,
+                            spanneds[0], spanneds[1], spanneds[2],
                             spanneds[3], spanneds[4],
                             ResultItemAdapter.ResultInfo.TYPE_GENERAL,
                             CommentRepository.TYPE_CHAR, spanneds[0].toString());
+                    if (item != null) {
+                        item.pronunciations = gcm.pronunciationOptions(i);
+                    }
                 }
                 break;
             case QUERYING_PRON:
                 parseJsonPron(jsonString, entrySettings, parsedItems);
                 break;
             case QUERYING_SHEET:
+                JyutpingAudioCatalog audioCatalog = JyutpingAudioCatalog.read(context);
                 FjbCharacter character; // TODO: Use ManagerClass like QUERYING_CHARA.
                 JSONArray jsonArray = new JSONArray(jsonString);
                 ArrayList<JSONObject> sortedEntries = new ArrayList<>(jsonArray.length());
-                if (jsonArray.length() == 0) {
-                    ToastUtil.msg(getContext(), getString(R.string.tips_no_result));
-                }
                 for (int i = 0; i < jsonArray.length(); i++) {
                     sortedEntries.add(jsonArray.getJSONObject(i));
                 }
@@ -265,9 +314,10 @@ public class ResultFragment extends Fragment {
                         FjbHeaderInfo.densityScore(left)
                 ));
                 for (JSONObject entry : sortedEntries) {
-                    character = new FjbCharacter(entry, entrySettings);
+                    character = new FjbCharacter(entry, entrySettings, audioCatalog);
 
-                    addItem(parsedItems, character.printCharacter(),
+                    ResultItemAdapter.ResultInfo item = addItem(parsedItems,
+                            character.printCharacter(),
                             character.printUnicode(),
                             character.printPronunciation(),
                             character.printMeanings(),
@@ -276,6 +326,9 @@ public class ResultFragment extends Fragment {
                             CommentRepository.TYPE_SHEET,
                             entry.optString("鍵", "")
                     );
+                    if (item != null) {
+                        item.pronunciations = character.pronunciationOptions();
+                    }
                 }
                 break;
             default:
@@ -297,6 +350,8 @@ public class ResultFragment extends Fragment {
             mRvMain.getItemAnimator().endAnimations();
         }
         resultAdapter.notifyDataSetChanged();
+        boolean hasResults = resultAdapter.getItemCount() > 0;
+        updateEmptyState(!hasResults);
         if (!revealNewResult) {
             resultRevealRunning = false;
             mRvMain.animate().cancel();
@@ -304,11 +359,32 @@ public class ResultFragment extends Fragment {
             mRvMain.setTranslationY(0f);
             return;
         }
-        if (resultAdapter.getItemCount() > 0) {
+        if (hasResults) {
             mRvMain.scrollToPosition(0);
         }
         resultRevealRunning = true;
         MotionUtil.reveal(mRvMain);
+    }
+
+    private void updateEmptyState(boolean isEmpty) {
+        if (emptyState == null) return;
+        if (isEmpty) {
+            showEmptyState(
+                    R.string.result_empty_title,
+                    R.string.result_empty_description,
+                    true);
+        } else {
+            emptyState.setVisibility(View.GONE);
+        }
+    }
+
+    private void showEmptyState(int titleRes, int textRes, boolean showRetry) {
+        if (emptyState == null || emptyStateTitle == null
+                || emptyStateText == null || emptyStateAction == null) return;
+        emptyStateTitle.setText(titleRes);
+        emptyStateText.setText(textRes);
+        emptyStateAction.setVisibility(showRetry ? View.VISIBLE : View.GONE);
+        emptyState.setVisibility(View.VISIBLE);
     }
 
 
@@ -327,19 +403,21 @@ public class ResultFragment extends Fragment {
      * @param rightBottom layout 中的右下部分
      *                    顯示地方音
      */
-    private void addItem(ArrayList<ResultItemAdapter.ResultInfo> items,
-                         Spanned chara, Spanned leftMiddle, Spanned leftBottom,
-                         Spanned rightTop, Spanned rightBottom, int type) {
-        addItem(items, chara, leftMiddle, leftBottom, rightTop, rightBottom,
+    private ResultItemAdapter.ResultInfo addItem(
+            ArrayList<ResultItemAdapter.ResultInfo> items,
+            Spanned chara, Spanned leftMiddle, Spanned leftBottom,
+            Spanned rightTop, Spanned rightBottom, int type) {
+        return addItem(items, chara, leftMiddle, leftBottom, rightTop, rightBottom,
                 type, null, null);
     }
 
-    private void addItem(ArrayList<ResultItemAdapter.ResultInfo> items,
-                         Spanned chara, Spanned leftMiddle, Spanned leftBottom,
-                         Spanned rightTop, Spanned rightBottom, int type,
-                         String commentType, String commentTarget) {
+    private ResultItemAdapter.ResultInfo addItem(
+            ArrayList<ResultItemAdapter.ResultInfo> items,
+            Spanned chara, Spanned leftMiddle, Spanned leftBottom,
+            Spanned rightTop, Spanned rightBottom, int type,
+            String commentType, String commentTarget) {
         if (rightTop.length()!=0 || rightBottom.length()!=0) {
-            items.add(new ResultItemAdapter.ResultInfo(
+            ResultItemAdapter.ResultInfo item = new ResultItemAdapter.ResultInfo(
                     chara,
                     leftMiddle,
                     leftBottom,
@@ -348,8 +426,11 @@ public class ResultFragment extends Fragment {
                     type,
                     commentType,
                     commentTarget
-            ));
+            );
+            items.add(item);
+            return item;
         }
+        return null;
     }
 
     private void loadCommentCounts() {
@@ -411,7 +492,8 @@ public class ResultFragment extends Fragment {
             for (int index = 0; index < books.length(); index++) {
                 JSONObject book = books.optJSONObject(index);
                 if (book == null) continue;
-                String name = book.optString("__name", "韻書");
+                String name = ChineseTextConverter.display(
+                        book.optString("__name", "韻書"));
                 if (!pronBookFilter.contains(name)) {
                     addPronunciationItem(parsedItems, new SpannableStringBuilder(name),
                             formatPronunciations(book, "__name"));
@@ -419,9 +501,19 @@ public class ResultFragment extends Fragment {
             }
         }
         if (areas != null) {
+            ArrayList<JSONObject> sortedAreas = new ArrayList<>(areas.length());
             for (int index = 0; index < areas.length(); index++) {
                 JSONObject area = areas.optJSONObject(index);
-                if (area == null) continue;
+                if (area != null) sortedAreas.add(area);
+            }
+            Collections.sort(sortedAreas, (left, right) -> {
+                int leftId = left.optInt("__id", -1);
+                int rightId = right.optInt("__id", -1);
+                int comparison = LocationInfo.compareGeographically(
+                        LocationInfo.get(leftId), LocationInfo.get(rightId));
+                return comparison == 0 ? Integer.compare(leftId, rightId) : comparison;
+            });
+            for (JSONObject area : sortedAreas) {
                 int locationId = area.optInt("__id", -1);
                 if (locationId != -1 && pronCityFilter.contains(String.valueOf(locationId))) {
                     continue;
@@ -430,9 +522,6 @@ public class ResultFragment extends Fragment {
                         locationLabel(LocationInfo.get(locationId), locationId, entrySettings),
                         formatPronunciations(area, "__id"));
             }
-        }
-        if (books == null && areas == null) {
-            ToastUtil.msg(getContext(), getString(R.string.tips_no_result));
         }
     }
 

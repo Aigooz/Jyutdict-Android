@@ -1,5 +1,6 @@
 package cc.ecisr.jyutdict;
 
+import android.Manifest;
 import static cc.ecisr.jyutdict.utils.EnumConst.*;
 
 import androidx.activity.result.ActivityResultLauncher;
@@ -12,10 +13,12 @@ import androidx.lifecycle.ViewModelProvider;
 
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.content.SharedPreferences;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.TransitionDrawable;
 import android.os.Bundle;
+import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 import android.text.Editable;
@@ -47,17 +50,20 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 
-import cc.ecisr.jyutdict.auth.AuthRepository;
 import cc.ecisr.jyutdict.databinding.ActivityMainBinding;
 import cc.ecisr.jyutdict.databinding.DialogFilterPronBinding;
+import cc.ecisr.jyutdict.databinding.DialogFilterPronCategoryBinding;
 import cc.ecisr.jyutdict.databinding.DialogLocationPickerBinding;
 import cc.ecisr.jyutdict.databinding.LocationPickerItemBinding;
+import cc.ecisr.jyutdict.search.DictionaryRecordStore;
+import cc.ecisr.jyutdict.search.SearchQueryNormalizer;
 import cc.ecisr.jyutdict.search.SearchViewModel;
 import cc.ecisr.jyutdict.search.SearchViewModel.Request;
 import cc.ecisr.jyutdict.struct.FjbHeaderInfo;
 import cc.ecisr.jyutdict.struct.GeneralCharacterManager;
 import cc.ecisr.jyutdict.struct.LocationInfo;
 import cc.ecisr.jyutdict.utils.ApiUrlBuilder;
+import cc.ecisr.jyutdict.utils.ChineseTextConverter;
 import cc.ecisr.jyutdict.utils.ColorUtil;
 import cc.ecisr.jyutdict.utils.DiskTextCache;
 import cc.ecisr.jyutdict.utils.ImmersiveBarUtil;
@@ -67,12 +73,14 @@ import cc.ecisr.jyutdict.utils.StringUtil;
 import cc.ecisr.jyutdict.utils.HttpUtil;
 import cc.ecisr.jyutdict.utils.ThemeUtil;
 import cc.ecisr.jyutdict.utils.ToastUtil;
+import cc.ecisr.jyutdict.update.UpdateManager;
+import cc.ecisr.jyutdict.update.UpdatePromptController;
 import androidx.appcompat.widget.AppCompatEditText;
 
 /**
  * app 的主頁面，包含一個查詢結果的 fragment
  */
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends LocalizedActivity {
     private static final String TAG = "`MainActivity";
     private static final String URL_API_ROOT = "https://jyutdict.org/api/v1.0/";
     private static final String SHEET_HEADER_CACHE_KEY = "main_sheet_header_v1";
@@ -92,14 +100,20 @@ public class MainActivity extends AppCompatActivity {
     private static final String LAST_LOCATION_COLUMN_KEY =
             "last_location_column_v2";
     private static final String EXTRA_THEME_TRANSITION = "theme_transition";
+    private static final String EXTRA_RECORD_QUERY = "record_query";
+    private static final String EXTRA_RECORD_MODE = "record_mode";
 
     AppCompatEditText inputEditText;
     private ActivityMainBinding binding;
-    Button btnFilterArea, btnFilterAreaPron, btnColoringJppPartial;
+    Button btnFilterArea, btnFilterAreaPron, btnFilterPron, btnColoringJppPartial;
     MaterialButton switchQueryOptsRev, switchQueryOptsRegex;
     RadioGroup sheetModeGroup;
     ResultFragment resultFragment;
     private SearchViewModel searchViewModel;
+    private DictionaryRecordStore recordStore;
+
+    private String pendingHistoryQuery = "";
+    private int pendingHistoryMode;
 
     // 查詢按鈕搜字/搜音雙態背景
     private TransitionDrawable queryButtonBackground;
@@ -107,7 +121,6 @@ public class MainActivity extends AppCompatActivity {
 
     boolean headerLoadingInitialized = false;
     boolean headerRetriesEnabled = false;
-    boolean authInitialized = false;
     boolean pendingSearch = false;
     int selectedLocationPosition = 0;
     Handler mainHandler;
@@ -131,6 +144,7 @@ public class MainActivity extends AppCompatActivity {
     // 並根據這個狀態來解析JSON
     int queryingModeConfig = 0;
     private boolean inputEnterKeyDown = false;
+    private ActivityResultLauncher<String> updateNotificationPermissionLauncher;
 
     private static final class LocationOption {
         final String label, queryColumn;
@@ -154,6 +168,7 @@ public class MainActivity extends AppCompatActivity {
         inputEditText = binding.editTextInput;
         btnFilterArea = binding.btnFilterArea;
         btnFilterAreaPron = binding.btnFilterAreaPron;
+        btnFilterPron = binding.btnFilterPron;
         btnColoringJppPartial = binding.btnColoringJppPartial;
         sheetModeGroup = binding.sheetModeGroup;
         switchQueryOptsRev = binding.switchReverseSearch;
@@ -186,7 +201,6 @@ public class MainActivity extends AppCompatActivity {
         getView();
         ImmersiveBarUtil.applyToolbarInsets(binding.toolBar);
         if (hasCheckedInfoActivity()) {
-            ensureAuthInitialized();
         }
         if (savedInstanceState == null) {
             resultFragment = new ResultFragment();
@@ -195,8 +209,25 @@ public class MainActivity extends AppCompatActivity {
             resultFragment = (ResultFragment) getSupportFragmentManager().getFragment(savedInstanceState, "result_fragment");
         }
         searchViewModel = new ViewModelProvider(this).get(SearchViewModel.class);
+        recordStore = new DictionaryRecordStore(this);
+        resultFragment.setResultCountListener(count -> {
+            if (pendingHistoryQuery.isEmpty()) return;
+            recordStore.recordSearch(pendingHistoryQuery, pendingHistoryMode,
+                    count, System.currentTimeMillis());
+            pendingHistoryQuery = "";
+            pendingHistoryMode = 0;
+        });
         binding.getRoot().post(this::observeSearchState);
+        binding.getRoot().post(this::handleRecordSearchIntent);
         mainHandler = new Handler(Looper.getMainLooper());
+
+        updateNotificationPermissionLauncher = registerForActivityResult(
+                new ActivityResultContracts.RequestPermission(),
+                granted -> {
+                    UpdateManager.schedulePeriodicCheck(this);
+                }
+        );
+        requestUpdateCheckStartup();
 
         // 查詢按鈕
         binding.btnQuery.setOnClickListener(v -> search());
@@ -251,6 +282,7 @@ public class MainActivity extends AppCompatActivity {
                         MotionUtil.beginLayoutTransition(binding.queryLayout);
                         btnFilterArea.setVisibility(isJpp ? View.GONE : View.VISIBLE);
                         btnFilterAreaPron.setVisibility(isJpp ? View.VISIBLE : View.GONE);
+                        btnFilterPron.setVisibility(View.VISIBLE);
                     }
                 }
             }
@@ -281,9 +313,10 @@ public class MainActivity extends AppCompatActivity {
         setInputEditTextHint();
         setSearchView();
         //inputEditText.setOnClickListener(v -> toggleNightTheme());
-        GeneralCharacterManager.cityFilter = new HashSet<>(
-                sp.getStringSet("querying_filter_city", new HashSet<>()));
-        if (GeneralCharacterManager.cityFilter.remove("韻書")) {
+        GeneralCharacterManager.cityFilter = loadDisplayFilterSet("querying_filter_city");
+        if (GeneralCharacterManager.cityFilter.remove("韻書")
+                || GeneralCharacterManager.cityFilter.remove(
+                        ChineseTextConverter.display("韻書"))) {
             GeneralCharacterManager.cityFilter.add(GeneralCharacterManager.FILTER_BOOK_FANWAN);
             GeneralCharacterManager.cityFilter.add(GeneralCharacterManager.FILTER_BOOK_JINGWAA);
         }
@@ -291,6 +324,12 @@ public class MainActivity extends AppCompatActivity {
                 sp.getStringSet("querying_filter_city_pron", new HashSet<>()));
         ResultFragment.pronBookFilter = new HashSet<>(
                 sp.getStringSet("querying_filter_book_pron", new HashSet<>()));
+        GeneralCharacterManager.hiddenInitials = new HashSet<>(
+                sp.getStringSet("querying_filter_pron_initial", new HashSet<>()));
+        GeneralCharacterManager.hiddenFinals = new HashSet<>(
+                sp.getStringSet("querying_filter_pron_final", new HashSet<>()));
+        GeneralCharacterManager.hiddenTones = new HashSet<>(
+                sp.getStringSet("querying_filter_pron_tone", new HashSet<>()));
         updateFilterButtonLabels();
 
         queryingModeConfig = sp.getInt("querying_mode_config", 0);
@@ -327,7 +366,7 @@ public class MainActivity extends AppCompatActivity {
         btnFilterAreaPron.setOnClickListener(v -> {
             ArrayList<LocationInfo.Location> locList = LocationInfo.getAll();
             if (locList.isEmpty()) {
-                ToastUtil.msg(this, "正在獲取地方信息，請稍候");
+                ToastUtil.msg(this, getString(R.string.main_fetching_location));
                 return;
             }
             ArrayList<String> names = new ArrayList<>();
@@ -373,6 +412,7 @@ public class MainActivity extends AppCompatActivity {
                     }
             );
         });
+        btnFilterPron.setOnClickListener(v -> showPronFilterDialog());
         setSearchView();
 
         initializeHeaderLoading();
@@ -507,6 +547,68 @@ public class MainActivity extends AppCompatActivity {
         dialog.setCanceledOnTouchOutside(true);
         dialog.show();
         constrainDialogWidth(dialog, 400);
+    }
+
+    private void showPronFilterDialog() {
+        GeneralCharacterManager manager = GeneralCharacterManager.getLastParsed();
+        if (manager == null || manager.length() == 0) {
+            ToastUtil.msg(this, getString(R.string.main_fetching_location));
+            return;
+        }
+        ArrayList<String> initials = new ArrayList<>();
+        ArrayList<String> finals = new ArrayList<>();
+        ArrayList<String> tones = new ArrayList<>();
+        GeneralCharacterManager.collectAvailableProns(manager, initials, finals, tones);
+        if (initials.isEmpty() && finals.isEmpty() && tones.isEmpty()) return;
+
+        DialogFilterPronCategoryBinding dialogBinding =
+                DialogFilterPronCategoryBinding.inflate(getLayoutInflater());
+
+        HashSet<String> tempInitials = new HashSet<>(GeneralCharacterManager.hiddenInitials);
+        HashSet<String> tempFinals = new HashSet<>(GeneralCharacterManager.hiddenFinals);
+        HashSet<String> tempTones = new HashSet<>(GeneralCharacterManager.hiddenTones);
+        tempInitials.retainAll(initials);
+        tempFinals.retainAll(finals);
+        tempTones.retainAll(tones);
+
+        populatePronFilterSection(
+                dialogBinding.pronFilterInitialContainer, initials, tempInitials);
+        populatePronFilterSection(
+                dialogBinding.pronFilterFinalContainer, finals, tempFinals);
+        populatePronFilterSection(
+                dialogBinding.pronFilterToneContainer, tones, tempTones);
+
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.search_filtering_pron)
+                .setView(dialogBinding.getRoot())
+                .setPositiveButton(R.string.button_confirm, (dialog, which) -> {
+                    GeneralCharacterManager.hiddenInitials = tempInitials;
+                    GeneralCharacterManager.hiddenFinals = tempFinals;
+                    GeneralCharacterManager.hiddenTones = tempTones;
+                    resultFragment.refreshResult();
+                    saveLayoutStatus();
+                    updateFilterButtonLabels();
+                })
+                .setNegativeButton(R.string.button_cancel, null)
+                .create()
+                .show();
+    }
+
+    private void populatePronFilterSection(LinearLayout container,
+                                           ArrayList<String> values,
+                                           HashSet<String> hidden) {
+        container.removeAllViews();
+        for (String value : values) {
+            AppCompatCheckBox checkBox = new AppCompatCheckBox(this);
+            checkBox.setText(value);
+            checkBox.setChecked(!hidden.contains(value));
+            checkBox.setOnCheckedChangeListener((button, isChecked) -> {
+                if (isChecked) hidden.remove(value);
+                else hidden.add(value);
+            });
+            checkBox.setTextSize(14);
+            container.addView(checkBox);
+        }
     }
 
     private void showLocationPickerDialog() {
@@ -678,18 +780,23 @@ public class MainActivity extends AppCompatActivity {
                     if (state.request == null || state.responseBody == null) return;
                     binding.resultFragment.post(() -> {
                         try {
+                            resultFragment.configureRecords(recordStore, state.request.responseMode);
                             resultFragment.parseJson(
                                     state.responseBody,
                                     state.request.responseMode);
                         } catch (JSONException | RuntimeException exception) {
                             Log.e(TAG, "Unable to parse search response", exception);
                             ToastUtil.msg(this, getString(R.string.error_tips_data));
+                            resultFragment.showParseError();
                         }
                         finishSearchUi();
                     });
                     break;
                 case ERROR:
+                    pendingHistoryQuery = "";
+                    pendingHistoryMode = 0;
                     showRequestError(state.error);
+                    if (resultFragment != null) resultFragment.showNetworkError();
                     finishSearchUi();
                     break;
                 case IDLE:
@@ -713,13 +820,6 @@ public class MainActivity extends AppCompatActivity {
         return sp != null && sp.getBoolean("had_checked_info_activity_2", false);
     }
 
-    private void ensureAuthInitialized() {
-        if (!authInitialized && hasCheckedInfoActivity()) {
-            authInitialized = true;
-            AuthRepository.getInstance(this).initialize((success, errorMessage) -> {});
-        }
-    }
-
     private void initializeHeaderLoading() {
         sheetHeader = new HeaderLoader(true,
                 ApiUrlBuilder.from(URL_API_ROOT, "sheet").build(), SHEET_HEADER_CACHE_KEY);
@@ -732,6 +832,16 @@ public class MainActivity extends AppCompatActivity {
         binding.headerLoadingStatus.setOnClickListener(view -> retryHeadersNow());
         boolean usingFreshCache = !sheetHeader.needsRefresh && !locationHeader.needsRefresh;
         updateHeaderLoadingStatus(usingFreshCache, usingFreshCache);
+    }
+
+    private void requestUpdateCheckStartup() {
+        UpdatePromptController.checkAndPrompt(this);
+        UpdateManager.schedulePeriodicCheck(this);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+                && ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
+                != PackageManager.PERMISSION_GRANTED) {
+            updateNotificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS);
+        }
     }
 
     private boolean applyHeader(boolean sheet, String raw, boolean cacheResponse) {
@@ -853,7 +963,10 @@ public class MainActivity extends AppCompatActivity {
         GeneralCharacterManager.cityList.add(GeneralCharacterManager.FILTER_BOOK_FANWAN);
         GeneralCharacterManager.cityList.add(GeneralCharacterManager.FILTER_BOOK_JINGWAA);
         for (LocationInfo.Location location : LocationInfo.getAll()) {
-            GeneralCharacterManager.cityList.add(location.displayName());
+            String displayName = location.displayName();
+            if (!GeneralCharacterManager.cityList.contains(displayName)) {
+                GeneralCharacterManager.cityList.add(displayName);
+            }
         }
         updateFilterButtonLabels();
     }
@@ -1089,7 +1202,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void updateFilterButtonLabels() {
-        if (btnFilterArea == null || btnFilterAreaPron == null) return;
+        if (btnFilterArea == null || btnFilterAreaPron == null || btnFilterPron == null) return;
 
         int generalTotal = GeneralCharacterManager.cityList.size();
         int generalHidden = 0;
@@ -1108,12 +1221,27 @@ public class MainActivity extends AppCompatActivity {
                 pronunciationTotal - pronunciationHidden);
         btnFilterAreaPron.setText(getString(R.string.search_filtering_area_pron_summary,
                 selectionCountLabel(pronunciationSelected, pronunciationTotal)));
+
+        int pronFilterCount = GeneralCharacterManager.hiddenInitials.size()
+                + GeneralCharacterManager.hiddenFinals.size()
+                + GeneralCharacterManager.hiddenTones.size();
+        btnFilterPron.setText(pronFilterCount == 0
+                ? getString(R.string.search_filtering_pron)
+                : getString(R.string.search_filtering_pron_summary, pronFilterCount));
     }
 
     private String selectionCountLabel(int selected, int total) {
         return total == 0 || selected == total
                 ? getString(R.string.search_filter_all)
                 : getString(R.string.search_filter_count, selected, total);
+    }
+
+    private HashSet<String> loadDisplayFilterSet(String key) {
+        HashSet<String> result = new HashSet<>();
+        for (String value : sp.getStringSet(key, new HashSet<>())) {
+            result.add(ChineseTextConverter.display(value));
+        }
+        return result;
     }
 
     /**
@@ -1131,6 +1259,7 @@ public class MainActivity extends AppCompatActivity {
                     ? View.VISIBLE : View.GONE);
             btnFilterArea.setVisibility(View.GONE);
             btnFilterAreaPron.setVisibility(View.GONE);
+            btnFilterPron.setVisibility(View.GONE);
             btnColoringJppPartial.setVisibility(View.GONE);
         } else {
             switchQueryOptsRev.setVisibility(View.GONE);
@@ -1139,6 +1268,7 @@ public class MainActivity extends AppCompatActivity {
             boolean isJpp = inputEditText.getText() != null && StringUtil.isJyutpingInput(inputEditText.getText().toString());
             btnFilterArea.setVisibility(isJpp ? View.GONE : View.VISIBLE);
             btnFilterAreaPron.setVisibility(isJpp ? View.VISIBLE : View.GONE);
+            btnFilterPron.setVisibility(View.VISIBLE);
             btnColoringJppPartial.setVisibility(View.VISIBLE);
         }
         switchQueryOptsRegex.setEnabled(is1Checked);
@@ -1173,6 +1303,12 @@ public class MainActivity extends AppCompatActivity {
             startActivitySetting.launch(
                     new Intent(MainActivity.this, SettingsActivity.class)
             );
+        } else if (itemId == R.id.menu_records) {
+            intent = new Intent(MainActivity.this, DictionaryRecordsActivity.class);
+            startActivity(intent);
+        } else if (itemId == R.id.menu_taishan) {
+            intent = new Intent(MainActivity.this, TaishanActivity.class);
+            startActivity(intent);
         } else if (itemId == R.id.menu_info) {
             intent = new Intent(MainActivity.this, InfoActivity.class);
             startActivity(intent);
@@ -1200,6 +1336,9 @@ public class MainActivity extends AppCompatActivity {
         editor.putStringSet("querying_filter_city", GeneralCharacterManager.cityFilter);
         editor.putStringSet("querying_filter_city_pron", ResultFragment.pronCityFilter);
         editor.putStringSet("querying_filter_book_pron", ResultFragment.pronBookFilter);
+        editor.putStringSet("querying_filter_pron_initial", GeneralCharacterManager.hiddenInitials);
+        editor.putStringSet("querying_filter_pron_final", GeneralCharacterManager.hiddenFinals);
+        editor.putStringSet("querying_filter_pron_tone", GeneralCharacterManager.hiddenTones);
         editor.apply();
     }
 
@@ -1214,7 +1353,6 @@ public class MainActivity extends AppCompatActivity {
      * @see cc.ecisr.jyutdict.utils.EnumConst
      */
     void search(String chara, int mode) {
-        inputEditText.setText(chara);
         switch (mode & QUERYING_MODE_MASK) { // 爲了方便以後增加不同的查詢模式，這裏 switch 不能化簡
             case QUERYING_CHARA:
             case QUERYING_PRON:
@@ -1225,6 +1363,7 @@ public class MainActivity extends AppCompatActivity {
                 break;
         }
         switchQueryOptsRev.setChecked(false);
+        inputEditText.setText(chara);
         search();
     }
 
@@ -1247,17 +1386,20 @@ public class MainActivity extends AppCompatActivity {
         if (input.isEmpty() && !(isSheetMode() && !switchQueryOptsRev.isChecked())) {
             return;
         } // 搜索欄爲空時不檢索
+        boolean regexMode = isSheetMode() && switchQueryOptsRegex.isChecked();
+        String searchInput = regexMode ? input : SearchQueryNormalizer.matchKey(input);
+        String historyQuery = input.trim();
 
         ApiUrlBuilder url;
         int modeSnapshot;
         if (isSheetMode()) { // 檢索泛粵字表
             modeSnapshot = QUERYING_SHEET;
             url = ApiUrlBuilder.from(URL_API_ROOT, "sheet");
-            if (input.isEmpty() && !switchQueryOptsRev.isChecked()) {
+            if (searchInput.isEmpty() && !switchQueryOptsRev.isChecked()) {
                 url.add("random", 10);
             } else {
-                url.add("q", input);
-                boolean pronunciationInput = StringUtil.isSheetPronunciationInput(input)
+                url.add("q", searchInput);
+                boolean pronunciationInput = StringUtil.isSheetPronunciationInput(searchInput)
                         && !switchQueryOptsRev.isChecked();
                 String sheetMode;
                 if (pronunciationInput) {
@@ -1268,7 +1410,7 @@ public class MainActivity extends AppCompatActivity {
                 } else {
                     sheetMode = "fuzzy";
                 }
-                if (switchQueryOptsRegex.isChecked()) {
+                if (regexMode) {
                     sheetMode = "regex";
                 }
                 url.add("mode", sheetMode);
@@ -1286,8 +1428,9 @@ public class MainActivity extends AppCompatActivity {
             }
         } else { // 檢索通用字表
             url = ApiUrlBuilder.from(URL_API_ROOT, "detail");
-            if (StringUtil.isJyutpingInput(input)) { // 音（允許空格作模糊佔位）
-                String[] parts = JyutpingUtil.parseJyutpingQuery(input);
+            String jyutpingInput = SearchQueryNormalizer.normalizeJyutping(searchInput);
+            if (StringUtil.isJyutpingInput(jyutpingInput)) { // 音（允許空格作模糊佔位）
+                String[] parts = JyutpingUtil.parseJyutpingQuery(jyutpingInput);
                 if (parts != null) {
                     modeSnapshot = QUERYING_PRON;
                     url.add("in", parts[0])
@@ -1300,16 +1443,43 @@ public class MainActivity extends AppCompatActivity {
                 } else {
                     // 解析失敗，回退為查字模式
                     modeSnapshot = QUERYING_CHARA;
-                    url.add("chara", input);
+                    url.add("chara", searchInput);
                 }
             } else { // 字
                 modeSnapshot = QUERYING_CHARA;
-                url.add("chara", input);
+                url.add("chara", searchInput);
             }
         }
         int responseMode = modeSnapshot | queryingModeConfig;
+        pendingHistoryQuery = historyQuery;
+        pendingHistoryMode = responseMode;
+        resultFragment.configureRecords(recordStore, responseMode);
         searchViewModel.search(new Request(url.build(), responseMode));
         saveLayoutStatus();
+    }
+
+    private void handleRecordSearchIntent() {
+        Intent intent = getIntent();
+        if (intent == null || !intent.hasExtra(EXTRA_RECORD_QUERY)) return;
+        String query = intent.getStringExtra(EXTRA_RECORD_QUERY);
+        int mode = intent.getIntExtra(EXTRA_RECORD_MODE, QUERYING_CHARA);
+        intent.removeExtra(EXTRA_RECORD_QUERY);
+        intent.removeExtra(EXTRA_RECORD_MODE);
+        if (query == null || query.trim().isEmpty()) return;
+        search(query, mode);
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        if (resultFragment != null && recordStore != null) {
+            binding.getRoot().post(this::handleRecordSearchIntent);
+        }
+    }
+
+    void retrySearch() {
+        search();
     }
 
     private void addPronunciationBookFilter(ApiUrlBuilder url) {
@@ -1336,17 +1506,22 @@ public class MainActivity extends AppCompatActivity {
                 setSearchView();
 
                 boolean isToggleNightMode = (resultCode&0b10) != 0;
-                if (isToggleNightMode) {
+                boolean isLanguageChanged = (resultCode&0b100) != 0;
+                if (isToggleNightMode || isLanguageChanged) {
                     applyLightDarkTheme();
-                    getIntent().putExtra(EXTRA_THEME_TRANSITION, true);
-                    int surface = ContextCompat.getColor(this,
-                            ThemeUtil.isNightMode(this)
-                                    ? R.color.colorBackgroundDark
-                                    : R.color.colorBackground);
-                    MotionUtil.fadeThroughColor(
-                            findViewById(android.R.id.content),
-                            surface,
-                            this::recreate);
+                    if (isToggleNightMode) {
+                        getIntent().putExtra(EXTRA_THEME_TRANSITION, true);
+                        int surface = ContextCompat.getColor(this,
+                                ThemeUtil.isNightMode(this)
+                                        ? R.color.colorBackgroundDark
+                                        : R.color.colorBackground);
+                        MotionUtil.fadeThroughColor(
+                                findViewById(android.R.id.content),
+                                surface,
+                                this::recreate);
+                    } else {
+                        recreate();
+                    }
                 } else {
                     resultFragment.refreshResult();
                 }
@@ -1371,22 +1546,29 @@ public class MainActivity extends AppCompatActivity {
      */
     private void displayTipsMessageBox() {
         new AlertDialog.Builder(this)
-                .setTitle("歡迎使用本應用！")
-                .setMessage("在使用之前，請務必閱覽本應用之說明。\n\n起碼把紅字看完！\n\n註意：內含隱私聲明，返回此界面則代表同意該聲明。")
-                .setPositiveButton("打開「幫助」頁面",
+                .setTitle(R.string.main_welcome_title)
+                .setMessage(R.string.main_welcome_message)
+                .setPositiveButton(R.string.main_welcome_action,
                         (dialogInterface, i) -> {
                             sp.edit().putBoolean("had_checked_info_activity_2", true).apply();
                             startActivity(new Intent(MainActivity.this, InfoActivity.class));
                         })
+                .setNegativeButton(R.string.main_welcome_start,
+                        (dialogInterface, i) -> startAfterWelcome())
                 .setCancelable(false)
                 .show();
+    }
+
+    private void startAfterWelcome() {
+        sp.edit().putBoolean("had_checked_info_activity_2", true).apply();
+        headerRetriesEnabled = true;
+        requestNeededHeaders();
     }
 
     @Override
     protected void onStart() {
         super.onStart();
         if (hasCheckedInfoActivity()) {
-            ensureAuthInitialized();
             headerRetriesEnabled = true;
             requestNeededHeaders();
         }
@@ -1394,6 +1576,7 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     protected void onStop() {
+        cc.ecisr.jyutdict.utils.PronunciationPlayer.stop();
         headerRetriesEnabled = false;
         sheetHeader.stop();
         locationHeader.stop();

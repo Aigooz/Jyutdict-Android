@@ -3,41 +3,12 @@
 
     <PreferenceCategory
         android:layout="@layout/preference_category_compact"
-        app:title="@string/auth_account">
-
-        <Preference
-            android:layout="@layout/preference_compact"
-            app:iconSpaceReserved="false"
-            app:key="account"
-            app:summary="@string/auth_account_summary"
-            app:title="@string/auth_sign_in" />
-
-    </PreferenceCategory>
-
-<!--    <PreferenceCategory app:title="@string/messages_header">-->
-
-<!--        <EditTextPreference-->
-<!--            app:key="signature"-->
-<!--            app:title="@string/signature_title"-->
-<!--            app:useSimpleSummaryProvider="true" />-->
-
-<!--        <ListPreference-->
-<!--            app:defaultValue="reply"-->
-<!--            app:entries="@array/reply_entries"-->
-<!--            app:entryValues="@array/reply_values"-->
-<!--            app:key="reply"-->
-<!--            app:title="@string/reply_title"-->
-<!--            app:useSimpleSummaryProvider="true" />-->
-
-<!--    </PreferenceCategory>-->
-
-    <PreferenceCategory
-        android:layout="@layout/preference_category_compact"
         app:title="@string/search_header">
         <SwitchPreferenceCompat
             android:layout="@layout/preference_compact"
             app:key="advanced_search"
             app:title="@string/search_title_advanced_options"
+            app:summary="@string/search_summary_advanced_options"
             app:defaultValue="false"
             app:iconSpaceReserved="false" />
 
@@ -45,7 +16,21 @@
             android:layout="@layout/preference_compact"
             app:key="reverse_search_concise"
             app:title="@string/display_title_reverse_search_concise"
+            app:summary="@string/search_summary_reverse_concise"
             app:defaultValue="true"
+            app:iconSpaceReserved="false" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        android:layout="@layout/preference_category_compact"
+        app:title="@string/update_public_title">
+
+        <Preference
+            android:layout="@layout/preference_compact"
+            app:key="public_update_source"
+            app:summary="@string/update_public_summary"
+            app:title="@string/about_open_update_release"
             app:iconSpaceReserved="false" />
 
     </PreferenceCategory>
@@ -58,6 +43,7 @@
             android:layout="@layout/preference_compact"
             app:key="area_coloring"
             app:title="@string/display_title_area_coloring"
+            app:summary="@string/display_summary_area_coloring"
             app:defaultValue="true"
             app:iconSpaceReserved="false" />
 
@@ -66,17 +52,10 @@
             app:key="area_coloring_darken_ratio"
             app:dependency="area_coloring"
             app:title="@string/display_title_area_coloring_ratio"
-            app:useSimpleSummaryProvider="true"
+            app:summary="@string/display_summary_area_coloring_ratio"
             app:defaultValue="0.92"
             app:iconSpaceReserved="false"
             />
-<!--        <SwitchPreferenceCompat-->
-<!--            app:dependency="sync"-->
-<!--            app:key="attachment"-->
-<!--            app:summaryOff="@string/attachment_summary_off"-->
-<!--            app:summaryOn="@string/attachment_summary_on"-->
-<!--            app:title="@string/attachment_title" />-->
-
         <SwitchPreferenceCompat
             android:layout="@layout/preference_compact"
             app:key="long_press_location_card"
@@ -89,6 +68,7 @@
             android:layout="@layout/preference_compact"
             app:key="phrase_meaning_domain"
             app:title="@string/display_title_phrase_meaning_domain"
+            app:summary="@string/display_summary_phrase_meaning_domain"
             app:defaultValue="false"
             app:iconSpaceReserved="false" />
 
@@ -96,16 +76,27 @@
             android:layout="@layout/preference_compact"
             app:key="ipa_presence"
             app:title="@string/display_title_ipa_present"
+            app:summary="@string/display_summary_ipa_present"
             app:defaultValue="true"
             app:iconSpaceReserved="false" />
         <ListPreference
             android:layout="@layout/preference_compact"
             app:key="theme_mode"
             app:title="@string/display_title_theme_mode"
+            app:summary="@string/display_summary_theme_mode"
             app:entries="@array/theme_mode_entries"
             app:entryValues="@array/theme_mode_values"
             app:defaultValue="follow_system"
-            app:useSimpleSummaryProvider="true"
+            app:iconSpaceReserved="false" />
+
+        <ListPreference
+            android:layout="@layout/preference_compact"
+            app:key="app_locale"
+            app:title="@string/display_title_language"
+            app:summary="@string/display_summary_language"
+            app:entries="@array/language_mode_entries"
+            app:entryValues="@array/language_mode_values"
+            app:defaultValue="system"
             app:iconSpaceReserved="false" />
 
     </PreferenceCategory>

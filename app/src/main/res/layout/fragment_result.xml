@@ -9,8 +9,48 @@
         android:layout_height="match_parent"
         android:background="?attr/clockBackground"
         android:clipToPadding="false"
-        android:paddingTop="2dp"
-        android:paddingBottom="8dp"
+        android:paddingTop="4dp"
+        android:paddingBottom="12dp"
         android:scrollbars="vertical" />
+
+    <LinearLayout
+        android:id="@+id/empty_state"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="?attr/clockBackground"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:padding="24dp">
+
+        <TextView
+            android:id="@+id/empty_state_title"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:text="@string/result_initial_title"
+            android:textColor="?attr/clockTextColor"
+            android:textSize="19sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/empty_state_text"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:gravity="center"
+            android:text="@string/result_initial_description"
+            android:textColor="?attr/clockTextColorDim"
+            android:textSize="14sp" />
+
+        <Button
+            android:id="@+id/empty_state_action"
+            style="@style/Widget.Jyutdict.LinkButton"
+            android:layout_width="wrap_content"
+            android:layout_height="40dp"
+            android:layout_marginTop="16dp"
+            android:text="@string/result_retry"
+            android:visibility="gone" />
+
+    </LinearLayout>
 
 </FrameLayout>
