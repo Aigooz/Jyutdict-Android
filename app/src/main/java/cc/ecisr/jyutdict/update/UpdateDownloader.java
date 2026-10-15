@@ -227,7 +227,7 @@ public final class UpdateDownloader {
                 throw new IllegalStateException("HTTP " + status);
             }
 
-            long totalBytes = connection.getContentLengthLong();
+            long totalBytes = contentLength(connection.getHeaderField("Content-Length"));
             long downloadedBytes = existingBytes;
             if (status == HttpURLConnection.HTTP_PARTIAL) {
                 Matcher range = contentRange(connection.getHeaderField("Content-Range"));
@@ -276,6 +276,15 @@ public final class UpdateDownloader {
             throw new IllegalStateException("Cannot finalize update file");
         }
         return destination;
+    }
+
+    static long contentLength(String header) {
+        try {
+            long length = Long.parseLong(header);
+            return length >= 0 ? length : -1;
+        } catch (NumberFormatException exception) {
+            return -1;
+        }
     }
 
     private static String partialName(AppUpdateClient.ReleaseInfo release) {

@@ -16,6 +16,13 @@ import org.robolectric.annotation.Config;
 @Config(sdk = 23)
 public class PublicUpdateTest {
     @Test
+    public void readsDownloadLengthsOnAndroidSix() {
+        assertEquals(4294967296L, UpdateDownloader.contentLength("4294967296"));
+        assertEquals(-1, UpdateDownloader.contentLength(null));
+        assertEquals(-1, UpdateDownloader.contentLength("unknown"));
+        assertEquals(-1, UpdateDownloader.contentLength("-3"));
+    }
+    @Test
     public void removesLegacyTokenWithoutLosingNotificationState() {
         Context context = ApplicationProvider.getApplicationContext();
         SharedPreferences settings = context.getSharedPreferences("settings", Context.MODE_PRIVATE);

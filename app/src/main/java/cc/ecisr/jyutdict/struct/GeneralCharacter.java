@@ -122,7 +122,9 @@ public class GeneralCharacter {
                 LocationInfo.get(left.id), LocationInfo.get(right.id)));
         city2index.clear();
         for (int index = 0; index < areas.size(); index++) {
-            city2index.putIfAbsent(areas.get(index).city, index);
+            if (!city2index.containsKey(areas.get(index).city)) {
+                city2index.put(areas.get(index).city, index);
+            }
         }
 
         // ===== 解析韻書（格式不變）=====

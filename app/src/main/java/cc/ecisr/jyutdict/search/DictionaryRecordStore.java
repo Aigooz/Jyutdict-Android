@@ -44,9 +44,13 @@ public final class DictionaryRecordStore {
         String normalized = SearchQueryNormalizer.normalize(displayQuery);
         if (normalized.isEmpty()) return;
         ArrayList<HistoryEntry> history = new ArrayList<>(history());
-        history.removeIf(entry -> SearchQueryNormalizer.matchKey(entry.query)
-                .equals(SearchQueryNormalizer.matchKey(displayQuery))
-                && entry.mode == mode);
+        for (int index = history.size() - 1; index >= 0; index--) {
+            HistoryEntry entry = history.get(index);
+            if (SearchQueryNormalizer.matchKey(entry.query)
+                    .equals(SearchQueryNormalizer.matchKey(displayQuery)) && entry.mode == mode) {
+                history.remove(index);
+            }
+        }
         history.add(0, new HistoryEntry(displayQuery, mode, resultCount, timestamp));
         while (history.size() > MAX_HISTORY) history.remove(history.size() - 1);
         writeArray(KEY_HISTORY, toHistoryJson(history));
@@ -58,7 +62,9 @@ public final class DictionaryRecordStore {
 
     public void removeHistory(HistoryEntry target) {
         ArrayList<HistoryEntry> history = new ArrayList<>(history());
-        history.removeIf(entry -> entry.id().equals(target.id()));
+        for (int index = history.size() - 1; index >= 0; index--) {
+            if (history.get(index).id().equals(target.id())) history.remove(index);
+        }
         writeArray(KEY_HISTORY, toHistoryJson(history));
     }
 
@@ -104,7 +110,9 @@ public final class DictionaryRecordStore {
 
     public void removeFavorite(FavoriteEntry target) {
         ArrayList<FavoriteEntry> favorites = new ArrayList<>(favorites());
-        favorites.removeIf(entry -> entry.key.equals(target.key));
+        for (int index = favorites.size() - 1; index >= 0; index--) {
+            if (favorites.get(index).key.equals(target.key)) favorites.remove(index);
+        }
         writeArray(KEY_FAVORITES, toFavoriteJson(favorites));
     }
 

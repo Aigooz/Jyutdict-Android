@@ -123,7 +123,8 @@ public class LocationInfo {
         if (left == right) return 0;
         if (left == null) return 1;
         if (right == null) return -1;
-        Comparator<String> strings = Comparator.nullsFirst(String::compareTo);
+        Comparator<String> strings = (a, b) -> a == b ? 0
+                : a == null ? -1 : b == null ? 1 : a.compareTo(b);
         int comparison = strings.compare(left.second, right.second);
         if (comparison == 0) comparison = strings.compare(left.third, right.third);
         if (comparison == 0) comparison = strings.compare(left.first, right.first);

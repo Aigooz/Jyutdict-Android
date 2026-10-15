@@ -1227,7 +1227,7 @@ public class MainActivity extends LocalizedActivity {
                 + GeneralCharacterManager.hiddenTones.size();
         btnFilterPron.setText(pronFilterCount == 0
                 ? getString(R.string.search_filtering_pron)
-                : getString(R.string.search_filtering_pron_summary, pronFilterCount));
+                : getString(R.string.search_filtering_pron_summary, String.valueOf(pronFilterCount)));
     }
 
     private String selectionCountLabel(int selected, int total) {
