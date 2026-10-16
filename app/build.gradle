@@ -82,6 +82,9 @@ android {
         resValues = true
         viewBinding = true
     }
+    testOptions {
+        unitTests.includeAndroidResources = true
+    }
 
 }
 

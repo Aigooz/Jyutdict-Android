@@ -56,10 +56,21 @@ final class TaishanAudioDialog {
             int matchLabel = recording.matchesReading(entry.rawIpa)
                     ? R.string.taishan_audio_reading_match : R.string.taishan_audio_reading_different;
             row.audioReadingMatch.setText(matchLabel);
-            String meaning = ChineseTextConverter.display(recording.mandarin);
-            if (!recording.english.isEmpty()) meaning += (meaning.isEmpty() ? "" : "\n") + recording.english;
+            String meaning = ChineseTextConverter.display(
+                    TaishanChineseTranslation.chineseMeaning(recording.mandarin, ""));
+            if (meaning.isEmpty()) meaning = activity.getString(R.string.taishan_chinese_missing);
             row.audioSourceMeaning.setText(meaning);
             row.audioSourceMeaning.setVisibility(meaning.isEmpty() ? View.GONE : View.VISIBLE);
+            if (!recording.english.isEmpty()) {
+                row.audioOriginalToggle.setVisibility(View.VISIBLE);
+                row.audioOriginal.setText(recording.english);
+                row.audioOriginalToggle.setOnClickListener(view -> {
+                    boolean visible = row.audioOriginal.getVisibility() == View.VISIBLE;
+                    row.audioOriginal.setVisibility(visible ? View.GONE : View.VISIBLE);
+                    row.audioOriginalToggle.setText(visible
+                            ? R.string.taishan_original_show : R.string.taishan_original_hide);
+                });
+            }
             Control control = new Control(recording.url, row.getRoot(), matchLabel);
             control.play.setImageTintList(ColorStateList.valueOf(ContextCompat.getColor(activity, R.color.colorPrimary)));
             control.play.setOnClickListener(view -> {

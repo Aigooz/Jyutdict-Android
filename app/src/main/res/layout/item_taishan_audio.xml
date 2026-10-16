@@ -50,6 +50,26 @@
                 android:textColor="?attr/clockTextColor"
                 android:textSize="14sp"
                 android:textIsSelectable="true" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/audio_original_toggle"
+                style="@style/Widget.MaterialComponents.Button.TextButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:minHeight="48dp"
+                android:text="@string/taishan_original_show"
+                android:textColor="?attr/clockAccentColor"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/audio_original"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:lineSpacingExtra="2dp"
+                android:textColor="?attr/clockTextColorDim"
+                android:textSize="13sp"
+                android:textIsSelectable="true"
+                android:visibility="gone" />
         </LinearLayout>
 
         <include layout="@layout/pronunciation_control" />

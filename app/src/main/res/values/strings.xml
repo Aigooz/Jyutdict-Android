@@ -58,6 +58,14 @@
     <string name="taishan_online_limit_hint">網站單次最多顯示前 100 條，請縮小關鍵詞範圍</string>
     <string name="taishan_online_equivalents">粵語：%1$s　普通話：%2$s</string>
     <string name="taishan_online_credit">來源：Stephen Li 台山話詞典</string>
+    <string name="taishan_chinese_missing">來源未提供中文釋義</string>
+    <string name="taishan_chinese_translate">翻譯補充說明</string>
+    <string name="taishan_chinese_loading">正在翻譯…</string>
+    <string name="taishan_chinese_retry">翻譯未完成，重試</string>
+    <string name="taishan_chinese_machine">中文機譯：%1$s</string>
+    <string name="taishan_chinese_notice">將此詞條的公開英文釋義及補充說明傳送至 MyMemory 取得中文機譯，結果僅供參考，不代表原作者的中文釋義。不傳送本機詞庫、收藏或錄音。</string>
+    <string name="taishan_original_show">英文原文</string>
+    <string name="taishan_original_hide">收起原文</string>
     <string name="taishan_online_play">播放來源錄音</string>
     <string name="taishan_online_open_source">打開 taishandict.com</string>
     <string name="comment_button">評論</string>

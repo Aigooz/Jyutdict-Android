@@ -47,7 +47,7 @@
         android:layout_marginTop="3dp"
         android:textColor="?attr/clockTextColor"
         android:textSize="14sp"
-        tools:text="Taishanese dialect" />
+        tools:text="台山话" />
 
     <TextView
         android:id="@+id/online_definition"
@@ -57,7 +57,43 @@
         android:lineSpacingExtra="2dp"
         android:textColor="?attr/clockTextColor"
         android:textSize="14sp"
-        tools:text="Description" />
+        tools:text="中文补充说明" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/online_translate"
+            style="@style/Widget.MaterialComponents.Button.TextButton"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:minHeight="48dp"
+            android:text="@string/taishan_chinese_translate"
+            android:textColor="?attr/clockAccentColor" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/online_original_toggle"
+            style="@style/Widget.MaterialComponents.Button.TextButton"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:minHeight="48dp"
+            android:text="@string/taishan_original_show"
+            android:textColor="?attr/clockAccentColor" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/online_original"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:lineSpacingExtra="2dp"
+        android:textColor="?attr/clockTextColorDim"
+        android:textSize="13sp"
+        android:textIsSelectable="true"
+        android:visibility="gone" />
 
     <LinearLayout
         android:layout_width="match_parent"
