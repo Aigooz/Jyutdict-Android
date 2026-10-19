@@ -30,7 +30,7 @@
             android:id="@+id/taishan_mode_local"
             style="@style/Widget.MaterialComponents.Button.OutlinedButton"
             android:layout_width="0dp"
-            android:layout_height="40dp"
+            android:layout_height="48dp"
             android:layout_weight="1"
             android:text="@string/taishan_mode_local"
             android:textAllCaps="false"
@@ -41,7 +41,7 @@
             android:id="@+id/taishan_mode_online"
             style="@style/Widget.MaterialComponents.Button.OutlinedButton"
             android:layout_width="0dp"
-            android:layout_height="40dp"
+            android:layout_height="48dp"
             android:layout_weight="1"
             android:text="@string/taishan_mode_online"
             android:textAllCaps="false"
@@ -51,7 +51,7 @@
 
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="44dp"
+        android:layout_height="48dp"
         android:background="?attr/clockBackground"
         android:elevation="3dp"
         android:gravity="center_vertical"
@@ -74,7 +74,7 @@
                 android:inputType="text"
                 android:maxLines="1"
                 android:paddingStart="12dp"
-                android:paddingEnd="36dp"
+                android:paddingEnd="48dp"
                 android:paddingVertical="0dp"
                 android:singleLine="true"
                 android:textColor="?attr/clockTextColor"
@@ -84,7 +84,7 @@
 
             <ImageView
                 android:id="@+id/taishan_clear"
-                android:layout_width="32dp"
+                android:layout_width="48dp"
                 android:layout_height="match_parent"
                 android:layout_gravity="end"
                 android:background="?attr/selectableItemBackgroundBorderless"

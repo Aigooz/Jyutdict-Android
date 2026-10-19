@@ -108,7 +108,7 @@
         <androidx.appcompat.widget.AppCompatButton
             android:id="@+id/update_install"
             android:layout_width="match_parent"
-            android:layout_height="46dp"
+            android:layout_height="48dp"
             android:background="@drawable/bg_solid_accent_button"
             android:foreground="?selectableItemBackground"
             android:gravity="center"
@@ -129,7 +129,7 @@
             <androidx.appcompat.widget.AppCompatButton
                 android:id="@+id/update_background"
                 android:layout_width="0dp"
-                android:layout_height="40dp"
+                android:layout_height="48dp"
                 android:layout_weight="1"
                 android:background="@drawable/bg_outline_button"
                 android:foreground="?selectableItemBackground"
@@ -145,7 +145,7 @@
             <androidx.appcompat.widget.AppCompatButton
                 android:id="@+id/update_later"
                 android:layout_width="0dp"
-                android:layout_height="40dp"
+                android:layout_height="48dp"
                 android:layout_marginStart="8dp"
                 android:layout_weight="1"
                 android:background="?selectableItemBackground"

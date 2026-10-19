@@ -28,11 +28,11 @@
 
         <ImageButton
             android:id="@+id/location_close"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:contentDescription="@string/location_close"
-            android:padding="10dp"
+            android:padding="12dp"
             android:src="@drawable/ic_close_20"
             app:tint="?attr/clockTextColor" />
 
@@ -93,7 +93,7 @@
         <androidx.appcompat.widget.AppCompatButton
             android:id="@+id/location_article"
             android:layout_width="0dp"
-            android:layout_height="44dp"
+            android:layout_height="48dp"
             android:layout_weight="1"
             android:background="@drawable/bg_solid_accent_button"
             android:enabled="false"
@@ -110,7 +110,7 @@
         <androidx.appcompat.widget.AppCompatButton
             android:id="@+id/location_phonology"
             android:layout_width="0dp"
-            android:layout_height="44dp"
+            android:layout_height="48dp"
             android:layout_marginStart="8dp"
             android:layout_weight="1"
             android:background="@drawable/bg_solid_accent_button"
