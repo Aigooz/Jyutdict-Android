@@ -5,6 +5,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.text.Editable;
 import android.text.TextWatcher;
+import android.util.Log;
 import android.view.View;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -43,6 +44,7 @@ import cc.ecisr.jyutdict.utils.PronunciationPlayer;
 
 /** Reader for user-imported dictionaries and online Taishanese sources. */
 public class TaishanActivity extends LocalizedActivity {
+    private static final String TAG = "TaishanActivity";
     private ActivityTaishanBinding binding;
     private TaishanEntryAdapter adapter;
     private TaishanOnlineAdapter onlineAdapter;
@@ -61,6 +63,7 @@ public class TaishanActivity extends LocalizedActivity {
                         TaishanDictionary.importDictionary(getApplicationContext(), uri);
                         success = true;
                     } catch (Exception exception) {
+                        Log.w(TAG, "Local dictionary import rejected", exception);
                         success = false;
                     }
                     final boolean imported = success;
@@ -132,6 +135,7 @@ public class TaishanActivity extends LocalizedActivity {
                         recordings.importRecording(key, uri);
                         success = true;
                     } catch (Exception exception) {
+                        Log.w(TAG, "Recording import failed for " + key, exception);
                         success = false;
                     }
                     final boolean imported = success;
@@ -297,6 +301,7 @@ public class TaishanActivity extends LocalizedActivity {
                     }
                 });
             } catch (Exception exception) {
+                Log.w(TAG, "Local dictionary load failed", exception);
                 runOnUiThread(() -> {
                     if (token != loadToken || isDestroyed() || binding == null) return;
                     offlineLoadFailed = true;
@@ -497,6 +502,7 @@ public class TaishanActivity extends LocalizedActivity {
                     useOnlineRecordings(entry, result, showChoices);
                 });
             } catch (Exception exception) {
+                Log.w(TAG, "Online recording lookup failed for " + key, exception);
                 mainHandler.post(() -> {
                     if (token != audioToken || binding == null || isFinishing() || isDestroyed()) return;
                     lookupKey = null;
@@ -674,6 +680,7 @@ public class TaishanActivity extends LocalizedActivity {
                     updateOnlineCount(result);
                 });
             } catch (Exception exception) {
+                Log.w(TAG, "Online dictionary search failed for " + lastOnlineQuery, exception);
                 mainHandler.post(() -> {
                     if (token != dictionaryToken || binding == null || !onlineMode
                             || isFinishing() || isDestroyed()) return;

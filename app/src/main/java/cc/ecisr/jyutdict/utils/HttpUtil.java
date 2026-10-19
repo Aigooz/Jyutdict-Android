@@ -20,8 +20,17 @@ import java.util.zip.GZIPInputStream;
 /** Small cancellable GET client which always delivers its latest result on the main thread. */
 public final class HttpUtil {
     private static final String TAG = "HttpUtil";
+    /** Characters buffered from one response; dictionary payloads stay far below this. */
+    private static final int MAX_RESPONSE_CHARS = 4_000_000;
 
-    public enum ErrorKind { INVALID_REQUEST, TIMEOUT, NETWORK, HTTP }
+    public enum ErrorKind { INVALID_REQUEST, TIMEOUT, NETWORK, HTTP, RESPONSE_TOO_LARGE }
+
+    /** Raised when a server sends more text than this client is willing to buffer. */
+    public static final class ResponseTooLargeException extends IOException {
+        public ResponseTooLargeException(String detail) {
+            super(detail);
+        }
+    }
 
     public interface Callback {
         void onSuccess(String body);
@@ -113,6 +122,9 @@ public final class HttpUtil {
 
             int statusCode = activeConnection.getResponseCode();
             if (statusCode >= 200 && statusCode < 300) {
+                if (activeConnection.getContentLength() > MAX_RESPONSE_CHARS) {
+                    throw new ResponseTooLargeException("Advertised body too large");
+                }
                 InputStream stream = activeConnection.getInputStream();
                 String encoding = activeConnection.getContentEncoding();
                 if (encoding != null && encoding.toLowerCase(Locale.ROOT).contains("gzip")) {
@@ -130,6 +142,11 @@ public final class HttpUtil {
             RequestError error = new RequestError(
                     ErrorKind.TIMEOUT, 0, exception.getMessage());
             deliver(requestGeneration, () -> callback.onFailure(error));
+        } catch (ResponseTooLargeException exception) {
+            Log.w(TAG, "response rejected: " + exception.getMessage());
+            RequestError error = new RequestError(
+                    ErrorKind.RESPONSE_TOO_LARGE, 0, exception.getMessage());
+            deliver(requestGeneration, () -> callback.onFailure(error));
         } catch (IOException exception) {
             if (isCurrent(requestGeneration) && !Thread.currentThread().isInterrupted()) {
                 Log.w(TAG, "request failed: " + exception.getClass().getSimpleName());
@@ -146,13 +163,22 @@ public final class HttpUtil {
         }
     }
 
-    private static String readBody(InputStream stream) throws IOException {
+    static String readBody(InputStream stream) throws IOException {
+        return readBody(stream, MAX_RESPONSE_CHARS);
+    }
+
+    static String readBody(InputStream stream, int maxChars) throws IOException {
         StringBuilder result = new StringBuilder();
         try (InputStream input = stream;
              InputStreamReader reader = new InputStreamReader(input, StandardCharsets.UTF_8);
              BufferedReader buffered = new BufferedReader(reader)) {
             String line;
-            while ((line = buffered.readLine()) != null) result.append(line).append('\n');
+            while ((line = buffered.readLine()) != null) {
+                result.append(line).append('\n');
+                if (result.length() > maxChars) {
+                    throw new ResponseTooLargeException("Body exceeded " + maxChars);
+                }
+            }
         }
         return result.toString();
     }

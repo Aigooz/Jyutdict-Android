@@ -20,6 +20,8 @@ import java.util.zip.GZIPInputStream;
 /** JSON API client for public Jyutdict requests. */
 public final class ApiClient {
     public static final String BASE_URL = "https://jyutdict.org";
+    /** Characters buffered from one response; JSON payloads stay far below this. */
+    private static final int MAX_RESPONSE_CHARS = 4_000_000;
     private static volatile ApiClient instance;
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
@@ -89,7 +91,12 @@ public final class ApiClient {
         try (BufferedReader reader = new BufferedReader(
                 new InputStreamReader(decoded, StandardCharsets.UTF_8))) {
             String line;
-            while ((line = reader.readLine()) != null) result.append(line);
+            while ((line = reader.readLine()) != null) {
+                result.append(line);
+                if (result.length() > MAX_RESPONSE_CHARS) {
+                    throw new IOException("Response exceeded " + MAX_RESPONSE_CHARS + " characters");
+                }
+            }
         }
         return result.toString();
     }

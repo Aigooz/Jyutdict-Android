@@ -3,6 +3,7 @@ package cc.ecisr.jyutdict;
 import android.content.Context;
 import android.os.Handler;
 import android.os.Looper;
+import android.util.Log;
 
 import org.json.JSONObject;
 
@@ -24,6 +25,7 @@ import cc.ecisr.jyutdict.utils.DiskTextCache;
 
 /** Translates public source text on demand; never changes the dictionary or IPA. */
 final class TaishanChineseTranslation implements AutoCloseable {
+    private static final String TAG = "TaishanTranslation";
     interface Callback { void complete(String chinese); }
     private final Context context;
     private final Handler main = new Handler(Looper.getMainLooper());
@@ -90,6 +92,7 @@ final class TaishanChineseTranslation implements AutoCloseable {
                     translated = result.toString();
                     if (!closed) DiskTextCache.write(context, "taishan-zh-v1:" + text, translated);
                 } catch (Exception exception) {
+                    if (!closed) Log.w(TAG, "Supplementary note translation failed", exception);
                     translated = null;
                 }
             }

@@ -135,6 +135,11 @@ public class GeneralCharacterManager {
         return lastParsedInstance;
     }
 
+    /** Releases the retained parse result once the screen that showed it is finishing. */
+    public static void clearLastParsed() {
+        lastParsedInstance = null;
+    }
+
     public void retrieveInfo() {
         resultCities.clear();
         for (GeneralCharacter character : charas) {
@@ -321,7 +326,7 @@ public class GeneralCharacterManager {
                     contentLoc.append(" ");
                     presentBeginPosition = contentLoc.length();
                     if (isMarkNeeded) contentLoc.append("/");
-                    int grayColor = Color.parseColor("#777777");
+                    int grayColor = Color.parseColor(settings.isUsingNightMode ? "#A7A7A7" : "#777777");
                     for (int j = 0; j < loc.prons.get(i).size(); j++) {
                         if (j > 0) {
                             contentLoc.append("=");

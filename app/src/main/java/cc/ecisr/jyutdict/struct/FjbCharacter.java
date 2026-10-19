@@ -110,7 +110,7 @@ public class FjbCharacter {
         int markerIndex = 0;
         for (String meaning : meanings) {
             if (meaning.isEmpty()) continue;
-            if (hasMarkers && !markers[markerIndex].isEmpty()) {
+            if (hasMarkers && markerIndex < markers.length && !markers[markerIndex].isEmpty()) {
                 String marker = markers[markerIndex].replace("？", "?");
                 if (meanings.length == 1) html.append("‹").append(marker).append("›");
                 else {
@@ -125,7 +125,10 @@ public class FjbCharacter {
             }
             html.append(ENTER);
         }
-        if (!original.isEmpty()) html.delete(html.length() - ENTER.length(), html.length());
+        if (html.length() >= ENTER.length()
+                && html.substring(html.length() - ENTER.length()).equals(ENTER)) {
+            html.delete(html.length() - ENTER.length(), html.length());
+        }
         return Html.fromHtml(ChineseTextConverter.display(html.toString()));
     }
 
@@ -159,7 +162,7 @@ public class FjbCharacter {
             String classText = ChineseTextConverter.display(classes.toString());
             int start = text.length();
             text.append("\n\n").append(classText);
-            span(text, new ForegroundColorSpan(Color.parseColor("#BBBBBB")),
+            span(text, new ForegroundColorSpan(ink("#9A9A9A", "#BBBBBB")),
                     start + 2, text.length());
         }
         return text;
@@ -186,7 +189,7 @@ public class FjbCharacter {
         int pronunciationEnd = text.length();
         text.append("  ");
         if ("_".equals(pronunciation)) {
-            span(text, new ForegroundColorSpan(Color.parseColor("#BBBBBB")),
+            span(text, new ForegroundColorSpan(ink("#9A9A9A", "#BBBBBB")),
                     styleStart, pronunciationEnd);
         }
         if (pronunciation.contains("?")) {
@@ -226,6 +229,7 @@ public class FjbCharacter {
         }
         for (String part : pronunciation.split("\\^")) {
             text.append(part);
+            if (part.isEmpty()) continue;
             if (part.charAt(0) > 'z') {
                 span(text, new StrikethroughSpan(),
                         text.length() - part.length(), text.length() - part.length() + 1);
@@ -263,12 +267,19 @@ public class FjbCharacter {
         if (!display.equals("歸")) display = display.replace("歸", "");
         SpannableStringBuilder text = new SpannableStringBuilder(display);
         if (character.contains("？") || character.contains("?")) {
-            span(text, new ForegroundColorSpan(Color.parseColor("#B9BAA3")), 0, text.length());
+            span(text, new ForegroundColorSpan(
+                    ink("#B9BAA3", "#8E8F7C")), 0, text.length());
         }
         if (character.contains("見 ") || character.contains("歸")) {
-            span(text, new ForegroundColorSpan(Color.parseColor("#3D3B4F")), 0, text.length());
+            span(text, new ForegroundColorSpan(
+                    ink("#3D3B4F", "#C3C1D6")), 0, text.length());
         }
         return text;
+    }
+
+    /** Dark inks need a light counterpart, otherwise night mode renders them invisible. */
+    private int ink(String lightHex, String darkHex) {
+        return Color.parseColor(settings.isUsingNightMode ? darkHex : lightHex);
     }
 
     public Spanned printUnicode() {

@@ -3,6 +3,7 @@ package cc.ecisr.jyutdict;
 import static cc.ecisr.jyutdict.utils.EnumConst.*;
 
 import android.annotation.SuppressLint;
+import android.app.Activity;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.os.Bundle;
@@ -49,6 +50,7 @@ import cc.ecisr.jyutdict.struct.EntrySetting;
 import cc.ecisr.jyutdict.struct.GeneralCharacterManager;
 import cc.ecisr.jyutdict.utils.ColorUtil;
 import cc.ecisr.jyutdict.utils.ChineseTextConverter;
+import cc.ecisr.jyutdict.utils.DiskTextCache;
 import cc.ecisr.jyutdict.utils.ImmersiveBarUtil;
 import cc.ecisr.jyutdict.utils.JyutpingAudioCatalog;
 import cc.ecisr.jyutdict.utils.PronunciationPlayer;
@@ -63,6 +65,12 @@ public class ResultFragment extends Fragment {
     }
 
     private static final String TAG = "ResultFragment";
+    private static final String STATE_RAW = "received_data";
+    private static final String STATE_RAW_CACHE_KEY = "received_data_cache_key";
+    private static final String STATE_MODE = "received_mode";
+    private static final String RESULT_STATE_CACHE = "result-page";
+    /** Payloads above this size go to disk instead of the saved-state Bundle. */
+    private static final int INLINE_STATE_LIMIT = 200_000;
 
     private RecyclerView mRvMain;
     private FragmentResultBinding binding;
@@ -107,8 +115,8 @@ public class ResultFragment extends Fragment {
         mRvMain.setItemAnimator(null);
         mRvMain.setAdapter(resultAdapter);
         if (savedInstanceState!= null) {
-            rawReceivedData = savedInstanceState.getString("received_data");
-            receivedMode = savedInstanceState.getInt("received_mode");
+            receivedMode = savedInstanceState.getInt(STATE_MODE);
+            rawReceivedData = restoreSavedResult(savedInstanceState);
         }
         if (rawReceivedData != null && !rawReceivedData.isEmpty()) refreshResult();
         else showEmptyState(
@@ -118,12 +126,33 @@ public class ResultFragment extends Fragment {
         return binding.getRoot();
     }
 
+    @Nullable
+    private String restoreSavedResult(Bundle savedInstanceState) {
+        String cacheKey = savedInstanceState.getString(STATE_RAW_CACHE_KEY);
+        Context context = getContext();
+        String cached = cacheKey == null || context == null ? null
+                : DiskTextCache.readAny(context, cacheKey);
+        if (cached != null && !cached.isEmpty()) return cached;
+        return savedInstanceState.getString(STATE_RAW);
+    }
+
     @Override
     public void onSaveInstanceState(@NonNull Bundle outState) {
         Log.d(TAG, "onSaveInstanceState: " + System.identityHashCode(this));
         super.onSaveInstanceState(outState);
-        outState.putString("received_data", rawReceivedData);
-        outState.putInt("received_mode", receivedMode);
+        outState.putInt(STATE_MODE, receivedMode);
+        if (rawReceivedData == null || rawReceivedData.isEmpty()) return;
+        if (rawReceivedData.length() <= INLINE_STATE_LIMIT) {
+            outState.putString(STATE_RAW, rawReceivedData);
+            return;
+        }
+        // Wide sheet queries exceed the Binder transaction budget; keep them off the Bundle.
+        Context context = getContext();
+        if (context != null && DiskTextCache.write(context, RESULT_STATE_CACHE, rawReceivedData)) {
+            outState.putString(STATE_RAW_CACHE_KEY, RESULT_STATE_CACHE);
+        } else {
+            outState.putString(STATE_RAW, rawReceivedData);
+        }
     }
 
     @Override
@@ -201,6 +230,8 @@ public class ResultFragment extends Fragment {
         ++parseToken;
         parseExecutor.shutdownNow();
         mainHandler.removeCallbacksAndMessages(null);
+        Activity host = getActivity();
+        if (host != null && host.isFinishing()) GeneralCharacterManager.clearLastParsed();
         super.onDestroy();
     }
 
