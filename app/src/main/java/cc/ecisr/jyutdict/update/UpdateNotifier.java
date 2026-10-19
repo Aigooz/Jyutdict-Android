@@ -116,14 +116,17 @@ public final class UpdateNotifier {
         File apkFile = new File(updateDir, release.assetName());
         Uri uri = FileProvider.getUriForFile(
                 context, context.getPackageName() + ".fileprovider", apkFile);
-        Intent installIntent = new Intent(Intent.ACTION_VIEW)
-                .setDataAndType(uri, "application/vnd.android.package-archive")
-                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION
-                        | Intent.FLAG_ACTIVITY_NEW_TASK);
+        boolean mayInstall = UpdateManager.canInstallApk(context);
+        Intent launchIntent = mayInstall
+                ? new Intent(Intent.ACTION_VIEW)
+                        .setDataAndType(uri, "application/vnd.android.package-archive")
+                        .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION
+                                | Intent.FLAG_ACTIVITY_NEW_TASK)
+                : UpdateManager.installPermissionIntent(context);
         PendingIntent contentIntent = PendingIntent.getActivity(
                 context,
                 INSTALL_NOTIFICATION_ID,
-                installIntent,
+                launchIntent,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
         );
 
@@ -133,7 +136,9 @@ public final class UpdateNotifier {
         Notification notification = builder
                 .setSmallIcon(android.R.drawable.stat_sys_download_done)
                 .setContentTitle(localizedContext.getString(R.string.update_bg_ready_title))
-                .setContentText(localizedContext.getString(R.string.update_bg_ready_text))
+                .setContentText(localizedContext.getString(mayInstall
+                        ? R.string.update_bg_ready_text
+                        : R.string.update_bg_ready_needs_permission))
                 .setContentIntent(contentIntent)
                 .setAutoCancel(true)
                 .build();

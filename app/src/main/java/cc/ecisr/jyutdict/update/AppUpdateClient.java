@@ -9,6 +9,7 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.BufferedReader;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
@@ -32,6 +33,7 @@ public final class AppUpdateClient {
             "^v?(\\d+)\\.(\\d+)\\.(\\d+)(?:[-+].*)?$",
             Pattern.CASE_INSENSITIVE);
     private static final ExecutorService EXECUTOR = Executors.newSingleThreadExecutor();
+    private static final int MAX_RESPONSE_CHARS = 4_000_000;
     private static volatile Handler mainHandler;
 
     public record ReleaseInfo(
@@ -98,9 +100,13 @@ public final class AppUpdateClient {
         try {
             connection = open(
                     "https://api.github.com/repos/" + BuildConfig.UPDATE_REPO
-                            + "/releases?per_page=100",
+                            + "/releases?per_page=20",
                     "application/vnd.github+json");
             int status = connection.getResponseCode();
+            if (status == 403 || status == 429) {
+                throw new UpdateException(context.getString(
+                        cc.ecisr.jyutdict.R.string.version_status_rate_limited));
+            }
             if (status < 200 || status >= 300) {
                 throw new UpdateException(context.getString(
                         cc.ecisr.jyutdict.R.string.version_status_http_error, status));
@@ -221,7 +227,12 @@ public final class AppUpdateClient {
              InputStreamReader reader = new InputStreamReader(input, StandardCharsets.UTF_8);
              BufferedReader buffered = new BufferedReader(reader)) {
             String line;
-            while ((line = buffered.readLine()) != null) result.append(line).append('\n');
+            while ((line = buffered.readLine()) != null) {
+                result.append(line).append('\n');
+                if (result.length() > MAX_RESPONSE_CHARS) {
+                    throw new IOException("Release list exceeded " + MAX_RESPONSE_CHARS + " characters");
+                }
+            }
         }
         return result.toString();
     }

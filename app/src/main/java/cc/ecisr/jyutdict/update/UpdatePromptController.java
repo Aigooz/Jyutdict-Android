@@ -105,6 +105,16 @@ public final class UpdatePromptController {
 
     private void startForegroundDownload() {
         if (!activityAlive() || selectedRelease == null || downloadHandle != null) return;
+        if (!UpdateManager.canInstallApk(activity)) {
+            new AlertDialog.Builder(activity)
+                    .setTitle(R.string.update_install_permission_title)
+                    .setMessage(R.string.update_install_permission_message)
+                    .setPositiveButton(R.string.update_install_open_settings, (dialog, which) ->
+                            UpdateManager.openInstallPermissionPage(activity))
+                    .setNegativeButton(R.string.button_cancel, null)
+                    .show();
+            return;
+        }
         AppUpdateClient.ReleaseInfo release = selectedRelease;
         downloadHandle = UpdateDownloader.downloadAndInstall(activity, release,
                 new UpdateDownloader.ProgressCallback() {
