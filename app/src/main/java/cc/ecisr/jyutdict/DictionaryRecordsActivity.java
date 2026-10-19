@@ -2,6 +2,7 @@ package cc.ecisr.jyutdict;
 
 import android.content.Intent;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.View;
 
 import androidx.annotation.NonNull;
@@ -14,11 +15,13 @@ import com.google.android.material.tabs.TabLayout;
 
 import cc.ecisr.jyutdict.databinding.ActivityDictionaryRecordsBinding;
 import cc.ecisr.jyutdict.search.DictionaryRecordStore;
+import cc.ecisr.jyutdict.utils.ChineseTextConverter;
 import cc.ecisr.jyutdict.utils.ImmersiveBarUtil;
 import cc.ecisr.jyutdict.utils.ThemeUtil;
 
 /** Local history and bookmarked snapshots for dictionary results. */
 public final class DictionaryRecordsActivity extends LocalizedActivity {
+    private static final String TAG = "DictionaryRecords";
     static final String EXTRA_QUERY = "record_query";
     static final String EXTRA_MODE = "record_mode";
     static final String EXTRA_TAB = "record_tab";
@@ -70,6 +73,11 @@ public final class DictionaryRecordsActivity extends LocalizedActivity {
             public void onRemoveFavorite(DictionaryRecordStore.FavoriteEntry entry) {
                 recordStore.removeFavorite(entry);
                 refresh();
+            }
+
+            @Override
+            public void onShareFavorite(DictionaryRecordStore.FavoriteEntry entry) {
+                shareFavorite(entry);
             }
         });
         binding.recordsList.setLayoutManager(new LinearLayoutManager(this));
@@ -131,6 +139,32 @@ public final class DictionaryRecordsActivity extends LocalizedActivity {
         intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
         startActivity(intent);
         finish();
+    }
+
+    private void shareFavorite(DictionaryRecordStore.FavoriteEntry entry) {
+        StringBuilder text = new StringBuilder();
+        appendShareLine(text, ChineseTextConverter.display(entry.headword));
+        appendShareLine(text, ChineseTextConverter.display(entry.readings));
+        appendShareLine(text, ChineseTextConverter.display(entry.definitions));
+        if (!entry.source.isEmpty()) {
+            appendShareLine(text, getString(R.string.records_share_source,
+                    ChineseTextConverter.display(entry.source)));
+        }
+        Intent share = new Intent(Intent.ACTION_SEND)
+                .setType("text/plain")
+                .putExtra(Intent.EXTRA_SUBJECT, ChineseTextConverter.display(entry.headword))
+                .putExtra(Intent.EXTRA_TEXT, text.toString());
+        try {
+            startActivity(Intent.createChooser(share, getString(R.string.records_share_entry)));
+        } catch (RuntimeException exception) {
+            Log.w(TAG, "No activity available to share a favorite entry", exception);
+        }
+    }
+
+    private static void appendShareLine(StringBuilder text, String value) {
+        if (value == null || value.isEmpty()) return;
+        if (text.length() > 0) text.append('\n');
+        text.append(value);
     }
 
     @Override

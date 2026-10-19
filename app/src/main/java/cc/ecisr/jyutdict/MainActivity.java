@@ -102,6 +102,7 @@ public class MainActivity extends LocalizedActivity {
     private static final String EXTRA_THEME_TRANSITION = "theme_transition";
     private static final String EXTRA_RECORD_QUERY = "record_query";
     private static final String EXTRA_RECORD_MODE = "record_mode";
+    private static final int MAX_SHARED_TEXT_LENGTH = 40;
 
     AppCompatEditText inputEditText;
     private ActivityMainBinding binding;
@@ -1460,13 +1461,31 @@ public class MainActivity extends LocalizedActivity {
 
     private void handleRecordSearchIntent() {
         Intent intent = getIntent();
-        if (intent == null || !intent.hasExtra(EXTRA_RECORD_QUERY)) return;
+        if (intent == null) return;
+        if (Intent.ACTION_PROCESS_TEXT.equals(intent.getAction())) {
+            handleProcessTextIntent(intent);
+            return;
+        }
+        if (!intent.hasExtra(EXTRA_RECORD_QUERY)) return;
         String query = intent.getStringExtra(EXTRA_RECORD_QUERY);
         int mode = intent.getIntExtra(EXTRA_RECORD_MODE, QUERYING_CHARA);
         intent.removeExtra(EXTRA_RECORD_QUERY);
         intent.removeExtra(EXTRA_RECORD_MODE);
         if (query == null || query.trim().isEmpty()) return;
         search(query, mode);
+    }
+
+    /** Text selected in another app is handed over by ACTION_PROCESS_TEXT. */
+    private void handleProcessTextIntent(Intent intent) {
+        CharSequence selected = intent.getCharSequenceExtra(Intent.EXTRA_PROCESS_TEXT);
+        if (selected == null) return;
+        intent.removeExtra(Intent.EXTRA_PROCESS_TEXT);
+        String query = selected.toString().replaceAll("\\s+", " ").trim();
+        if (query.isEmpty()) return;
+        if (query.length() > MAX_SHARED_TEXT_LENGTH) {
+            query = query.substring(0, MAX_SHARED_TEXT_LENGTH).trim();
+        }
+        search(query, QUERYING_CHARA);
     }
 
     @Override

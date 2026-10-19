@@ -34,6 +34,8 @@ final class DictionaryRecordsAdapter extends RecyclerView.Adapter<DictionaryReco
 
         void onOpenFavorite(DictionaryRecordStore.FavoriteEntry entry);
 
+        void onShareFavorite(DictionaryRecordStore.FavoriteEntry entry);
+
         void onRemoveHistory(DictionaryRecordStore.HistoryEntry entry);
 
         void onRemoveFavorite(DictionaryRecordStore.FavoriteEntry entry);
@@ -145,6 +147,10 @@ final class DictionaryRecordsAdapter extends RecyclerView.Adapter<DictionaryReco
                     itemView.getContext(), R.color.colorPrimary)));
             setActionDescription(itemView.getContext().getString(R.string.records_remove_favorite));
             itemView.setOnClickListener(view -> listener.onOpenFavorite(entry));
+            itemView.setOnLongClickListener(view -> {
+                listener.onShareFavorite(entry);
+                return true;
+            });
             action.setOnClickListener(view -> listener.onRemoveFavorite(entry));
         }
 
