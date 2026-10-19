@@ -143,11 +143,15 @@
     <string name="records_history_empty_title">还没有查询记录</string>
     <string name="records_history_empty_text">搜索成功后会自动保存在这里，方便再次打开。</string>
     <string name="records_favorites_empty_title">还没有收藏词条</string>
-    <string name="records_favorites_empty_text">在查询结果右侧点书签，即可保存词条、读音、释义与来源快照。</string>
+    <string name="records_favorites_empty_text">在查询结果右侧点书签，即可保存词条、读音、释义与来源快照。长按词条可分享。</string>
     <string name="records_favorite_add">收藏词条</string>
     <string name="records_favorite_remove">取消收藏</string>
     <string name="records_favorite_added">已加入收藏</string>
     <string name="records_favorite_removed">已取消收藏</string>
+    <string name="favorite_source_general">通用字表</string>
+    <string name="favorite_source_pronunciation">通用字表 · 读音</string>
+    <string name="favorite_source_sheet">泛粤字表</string>
+    <string name="favorite_source_unknown">粤辞</string>
     <string name="records_clear_history">清空查询记录</string>
     <string name="records_clear_history_confirm">要清空全部查询记录吗？收藏不会被删除。</string>
     <string name="records_remove_history">删除此记录</string>
@@ -159,6 +163,8 @@
     <string name="records_mode_pron">通用字表 · 查音</string>
     <string name="records_mode_sheet">泛粤字表</string>
     <string name="records_saved_at">收藏于 %1$s</string>
+    <string name="records_share_entry">分享词条</string>
+    <string name="records_share_source">来源：%1$s</string>
     <string name="result_empty_title">没有找到结果</string>
     <string name="result_empty_description">可尝试更换字词、改用扩展粤拼，或检查筛选条件。</string>
     <string name="result_error_title">查询未完成</string>
@@ -256,6 +262,7 @@
     <string name="version_status_build_available">发现新版本 %1$s</string>
     <string name="version_status_invalid">服务器返回的版本资料无法识别</string>
     <string name="version_status_http_error">更新服务返回错误码：%1$d</string>
+    <string name="version_status_rate_limited">更新服务暂时拒绝请求，稍后再手动检查</string>
     <string name="version_status_failed">暂时无法连接版本服务</string>
     <string name="version_check_action">检查新版本</string>
     <string name="version_update_action">下载并安装</string>
@@ -317,6 +324,10 @@
     <string name="update_bg_progress_unknown">已下载 %1$s</string>
     <string name="update_bg_ready_title">更新已下载完成</string>
     <string name="update_bg_ready_text">点按安装</string>
+    <string name="update_bg_ready_needs_permission">本机尚未获准安装应用，点按前往设置</string>
+    <string name="update_install_permission_title">安装更新需要先授权</string>
+    <string name="update_install_permission_message">系统要开通“安装未知应用”权限，才能打开已下载的安装包。按“前往设置”开启后返回，再按一次“安装”即可；下载好的文件不会丢失。</string>
+    <string name="update_install_open_settings">前往设置</string>
     <string name="update_bg_failed_title">更新下载失败</string>
     <string name="update_bg_failed_text">下次检查时会自动重试</string>
     <string name="search_filter_hint">输入文字筛选地点</string>

@@ -46,6 +46,7 @@ public class ResultItemAdapter extends RecyclerView.Adapter<ResultItemAdapter.Li
     private final ArrayList<ResultInfo> items = new ArrayList<>();
     private static final Object PLAYBACK = new Object();
     private static final Object FAVORITE = new Object();
+    private static Paint sharedMeasurePaint;
     private DictionaryRecordStore recordStore;
     private int receivedMode;
     private final Set<String> favoriteKeys = new LinkedHashSet<>();
@@ -163,6 +164,13 @@ public class ResultItemAdapter extends RecyclerView.Adapter<ResultItemAdapter.Li
         return result;
     }
 
+    private static Paint measuringPaint(Context context) {
+        if (sharedMeasurePaint == null) sharedMeasurePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        sharedMeasurePaint.setTextSize(TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, 13,
+                context.getResources().getDisplayMetrics()));
+        return sharedMeasurePaint;
+    }
+
     private static Spanned formatGeneralEntry(Context context, Spanned header, Spanned extra,
                                               Spanned wanshyu, Spanned location) {
         SpannableStringBuilder result = new SpannableStringBuilder();
@@ -173,9 +181,7 @@ public class ResultItemAdapter extends RecyclerView.Adapter<ResultItemAdapter.Li
         if (hasHeader) {
             CharacterHeaderSpan headerSpan = new CharacterHeaderSpan(
                     context, !hasExtra && !hasWanshyu);
-            Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
-            paint.setTextSize(TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, 13,
-                    context.getResources().getDisplayMetrics()));
+            Paint paint = measuringPaint(context);
             int headerWidth = headerSpan.getTotalWidth(
                     paint, header.toString(), 0, header.length());
             int headerStart = result.length();
@@ -256,10 +262,16 @@ public class ResultItemAdapter extends RecyclerView.Adapter<ResultItemAdapter.Li
     }
 
     private static String favoriteKey(int mode, ResultInfo item) {
+        if (item.cachedFavoriteKey != null && item.cachedFavoriteMode == mode) {
+            return item.cachedFavoriteKey;
+        }
         String headword = empty(item.chara) ? "" : item.chara.toString();
         String readings = favoriteReadings(item);
-        return mode + "\u0000" + SearchQueryNormalizer.normalize(headword)
+        String key = mode + "\u0000" + SearchQueryNormalizer.normalize(headword)
                 + "\u0000" + SearchQueryNormalizer.normalize(readings);
+        item.cachedFavoriteKey = key;
+        item.cachedFavoriteMode = mode;
+        return key;
     }
 
     private static String favoriteReadings(ResultInfo item) {
@@ -276,12 +288,12 @@ public class ResultItemAdapter extends RecyclerView.Adapter<ResultItemAdapter.Li
         return result.toString().trim();
     }
 
-    private static String favoriteSource(int mode) {
+    private static String favoriteSource(Context context, int mode) {
         switch (mode & QUERYING_MODE_MASK) {
-            case QUERYING_CHARA: return "通用字表";
-            case QUERYING_PRON: return "通用字表 · 读音";
-            case QUERYING_SHEET: return "泛粤字表";
-            default: return "粤辞";
+            case QUERYING_CHARA: return context.getString(R.string.favorite_source_general);
+            case QUERYING_PRON: return context.getString(R.string.favorite_source_pronunciation);
+            case QUERYING_SHEET: return context.getString(R.string.favorite_source_sheet);
+            default: return context.getString(R.string.favorite_source_unknown);
         }
     }
 
@@ -361,7 +373,7 @@ public class ResultItemAdapter extends RecyclerView.Adapter<ResultItemAdapter.Li
                     DictionaryRecordStore.FavoriteEntry.createWithKey(
                             key, headword, favoriteReadings(currentItem),
                             favoriteDefinitions(currentItem),
-                            favoriteSource(receivedMode), receivedMode,
+                            favoriteSource(itemView.getContext(), receivedMode), receivedMode,
                             System.currentTimeMillis()));
             favoriteKeys.clear();
             for (DictionaryRecordStore.FavoriteEntry entry : recordStore.favorites()) {
@@ -481,6 +493,8 @@ public class ResultItemAdapter extends RecyclerView.Adapter<ResultItemAdapter.Li
         final int type;
         final CommentTarget commentTarget;
         List<PronunciationOption> pronunciations = Collections.emptyList();
+        String cachedFavoriteKey;
+        int cachedFavoriteMode = -1;
 
         ResultInfo(Spanned chara, Spanned leftMiddle, Spanned leftBottom,
                    Spanned rightTop, Spanned rightBottom, int type,

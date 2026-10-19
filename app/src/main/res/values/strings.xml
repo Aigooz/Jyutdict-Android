@@ -143,11 +143,15 @@
     <string name="records_history_empty_title">還沒有查詢記錄</string>
     <string name="records_history_empty_text">搜索成功後會自動保存在這裡，方便再次打開。</string>
     <string name="records_favorites_empty_title">還沒有收藏詞條</string>
-    <string name="records_favorites_empty_text">在查詢結果右側點書籤，即可保存詞條、讀音、釋義與來源快照。</string>
+    <string name="records_favorites_empty_text">在查詢結果右側點書籤，即可保存詞條、讀音、釋義與來源快照。長按詞條可分享。</string>
     <string name="records_favorite_add">收藏詞條</string>
     <string name="records_favorite_remove">取消收藏</string>
     <string name="records_favorite_added">已加入收藏</string>
     <string name="records_favorite_removed">已取消收藏</string>
+    <string name="favorite_source_general">通用字表</string>
+    <string name="favorite_source_pronunciation">通用字表 · 讀音</string>
+    <string name="favorite_source_sheet">泛粵字表</string>
+    <string name="favorite_source_unknown">粵辭</string>
     <string name="records_clear_history">清空查詢記錄</string>
     <string name="records_clear_history_confirm">要清空全部查詢記錄嗎？收藏不會被刪除。</string>
     <string name="records_remove_history">刪除此記錄</string>
@@ -159,6 +163,8 @@
     <string name="records_mode_pron">通用字表 · 查音</string>
     <string name="records_mode_sheet">泛粵字表</string>
     <string name="records_saved_at">收藏於 %1$s</string>
+    <string name="records_share_entry">分享詞條</string>
+    <string name="records_share_source">來源：%1$s</string>
     <string name="result_empty_title">沒有找到結果</string>
     <string name="result_empty_description">可嘗試更換字詞、改用擴展粵拼，或檢查篩選條件。</string>
     <string name="result_error_title">查詢未完成</string>
@@ -256,6 +262,7 @@
     <string name="version_status_build_available">發現新版本 %1$s</string>
     <string name="version_status_invalid">服務器返回的版本資料無法識別</string>
     <string name="version_status_http_error">更新服務返回錯誤碼：%1$d</string>
+    <string name="version_status_rate_limited">更新服務暫時拒絕請求，稍後再手動檢查</string>
     <string name="version_status_failed">暫時無法連接版本服務</string>
     <string name="version_check_action">檢查新版本</string>
     <string name="version_update_action">下載並安裝</string>
@@ -317,6 +324,10 @@
     <string name="update_bg_progress_unknown">已下載 %1$s</string>
     <string name="update_bg_ready_title">更新已下載完成</string>
     <string name="update_bg_ready_text">點按安裝</string>
+    <string name="update_bg_ready_needs_permission">本機尚未獲准安裝應用，點按前往設定</string>
+    <string name="update_install_permission_title">安裝更新需要先授權</string>
+    <string name="update_install_permission_message">系統要開通「安裝未知應用」權限，才能打開已下載的安裝包。按「前往設定」開啟後返回，再按一次「安裝」即可；下載好的檔案不會遺失。</string>
+    <string name="update_install_open_settings">前往設定</string>
     <string name="update_bg_failed_title">更新下載失敗</string>
     <string name="update_bg_failed_text">下次檢查時會自動重試</string>
     <string name="search_filter_hint">輸入文字篩選地點</string>

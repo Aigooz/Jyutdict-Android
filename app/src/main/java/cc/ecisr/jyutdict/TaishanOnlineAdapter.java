@@ -21,8 +21,11 @@ import cc.ecisr.jyutdict.utils.ChineseTextConverter;
 import cc.ecisr.jyutdict.utils.PronunciationPlayer;
 
 final class TaishanOnlineAdapter extends RecyclerView.Adapter<TaishanOnlineAdapter.Holder> {
+    private static final Object PLAYBACK = new Object();
     private final List<TaishanAudioSource.DictionaryEntry> entries = new ArrayList<>();
-    private final PronunciationPlayer.Listener playbackListener = (key, state) -> notifyDataSetChanged();
+    private final PronunciationPlayer.Listener playbackListener = (key, state) -> {
+        if (!entries.isEmpty()) notifyItemRangeChanged(0, entries.size(), PLAYBACK);
+    };
     private TaishanChineseTranslation translator;
     private final java.util.Map<String, String> translated = new java.util.HashMap<>();
     private final java.util.Set<String> expanded = new java.util.HashSet<>();
@@ -106,12 +109,24 @@ final class TaishanOnlineAdapter extends RecyclerView.Adapter<TaishanOnlineAdapt
                     .setNegativeButton(R.string.button_cancel, null).show();
         });
         holder.source.setText(R.string.taishan_online_credit);
-        String key = "taishan-online:" + entry.headword + ":" + entry.ipa + ":" + entry.audioUrl;
+        bindPlayback(holder, entry);
+    }
+
+    @Override
+    public void onBindViewHolder(@NonNull Holder holder, int position,
+                                 @NonNull List<Object> payloads) {
+        if (payloads.contains(PLAYBACK)) bindPlayback(holder, entries.get(position));
+        else super.onBindViewHolder(holder, position, payloads);
+    }
+
+    private void bindPlayback(Holder holder, TaishanAudioSource.DictionaryEntry entry) {
+        String key = playbackKey(entry);
         boolean active = PronunciationPlayer.isActive(key);
+        Context context = holder.itemView.getContext();
         holder.play.setImageResource(active ? R.drawable.ic_stop_24 : R.drawable.ic_volume_24);
         holder.play.setEnabled(entry.audioUrl != null);
         holder.play.setAlpha(entry.audioUrl == null ? 0.38f : 1f);
-        holder.play.setContentDescription(holder.itemView.getContext().getString(active
+        holder.play.setContentDescription(context.getString(active
                 ? R.string.pron_audio_stop : R.string.taishan_online_play));
         holder.play.setOnClickListener(view -> {
             if (PronunciationPlayer.isActive(key)) PronunciationPlayer.stop();
@@ -119,6 +134,10 @@ final class TaishanOnlineAdapter extends RecyclerView.Adapter<TaishanOnlineAdapt
                 PronunciationPlayer.playTaishanReference(view.getContext(), key, entry.audioUrl);
             }
         });
+    }
+
+    private static String playbackKey(TaishanAudioSource.DictionaryEntry entry) {
+        return "taishan-online:" + entry.headword + ":" + entry.ipa + ":" + entry.audioUrl;
     }
 
     @Override
