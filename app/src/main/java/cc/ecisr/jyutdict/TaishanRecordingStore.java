@@ -12,12 +12,15 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.util.HashSet;
+import java.util.Set;
 
 /** User-supplied recordings stay separate from both the book and Cantonese reference audio. */
 final class TaishanRecordingStore {
     private static final Object FILE_LOCK = new Object();
     private final Context context;
     private final File directory;
+    private final Set<String> inspectedPaths = new HashSet<>();
     private static final long MAX_BYTES = 20L * 1024 * 1024;
     private static final long MAX_DURATION_MS = 120_000;
 
@@ -33,11 +36,15 @@ final class TaishanRecordingStore {
     File file(TaishanEntry entry) {
         File file = fileForKey(key(entry));
         synchronized (FILE_LOCK) {
-            // Android 6-10 leave a backup if an atomic replacement is interrupted.
-            if (new File(file.getPath() + ".bak").isFile()) {
-                try (FileInputStream ignored = new AtomicFile(file).openRead()) {
-                    // Opening the file restores the previous complete recording.
-                } catch (IOException ignored) {}
+            // Listing rows ask repeatedly; the interrupted-replacement repair only runs once
+            // per file per session, because a new orphan backup needs a process restart.
+            if (inspectedPaths.add(file.getPath())) {
+                // Android 6-10 leave a backup if an atomic replacement is interrupted.
+                if (new File(file.getPath() + ".bak").isFile()) {
+                    try (FileInputStream ignored = new AtomicFile(file).openRead()) {
+                        // Opening the file restores the previous complete recording.
+                    } catch (IOException ignored) {}
+                }
             }
         }
         return file;
@@ -59,8 +66,7 @@ final class TaishanRecordingStore {
     }
 
     boolean contains(TaishanEntry entry) {
-        File file = file(entry);
-        return file.isFile() && file.length() > 0;
+        return file(entry).length() > 0;
     }
 
     void delete(TaishanEntry entry) {

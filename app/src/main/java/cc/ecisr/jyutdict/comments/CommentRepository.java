@@ -17,6 +17,7 @@ import cc.ecisr.jyutdict.network.ApiClient;
 public final class CommentRepository {
     public static final String TYPE_CHAR = "char";
     public static final String TYPE_SHEET = "sheet";
+    private static final int COUNT_BATCH = 40;
     private final ApiClient apiClient;
 
     public CommentRepository() {
@@ -47,23 +48,41 @@ public final class CommentRepository {
             callback.onResult(new LinkedHashMap<>(), null);
             return;
         }
+        List<String> pending = new ArrayList<>(targets);
+        Map<String, Integer> merged = new LinkedHashMap<>();
+        for (String target : pending) merged.put(target, 0);
+        int batches = (pending.size() + COUNT_BATCH - 1) / COUNT_BATCH;
+        requestCountBatch(type, pending, 0, batches, merged, new int[1], callback);
+    }
+
+    /** Batches keep one query string short enough for the API to accept. */
+    private void requestCountBatch(String type, List<String> targets, int from, int batches,
+                                   Map<String, Integer> merged, int[] failures,
+                                   CountsCallback callback) {
+        int to = Math.min(from + COUNT_BATCH, targets.size());
         StringBuilder joined = new StringBuilder();
-        for (String target : targets) {
+        for (int index = from; index < to; index++) {
             if (joined.length() > 0) joined.append(',');
-            joined.append(target);
+            joined.append(targets.get(index));
         }
         apiClient.get("/api/v1.0/comments/counts?type=" + encode(type)
                 + "&targets=" + encode(joined.toString()), (body, error) -> {
             if (error != null) {
-                callback.onResult(null, error);
+                failures[0]++;
+            } else {
+                JSONObject json = body.optJSONObject("counts");
+                if (json != null) {
+                    for (int index = from; index < to; index++) {
+                        String target = targets.get(index);
+                        if (json.has(target)) merged.put(target, json.optInt(target, 0));
+                    }
+                }
+            }
+            if (to < targets.size()) {
+                requestCountBatch(type, targets, to, batches, merged, failures, callback);
                 return;
             }
-            JSONObject json = body.optJSONObject("counts");
-            Map<String, Integer> counts = new LinkedHashMap<>();
-            for (String target : targets) {
-                counts.put(target, json == null ? 0 : json.optInt(target, 0));
-            }
-            callback.onResult(counts, null);
+            callback.onResult(merged, failures[0] >= batches ? "Comment counts unavailable" : null);
         });
     }
 

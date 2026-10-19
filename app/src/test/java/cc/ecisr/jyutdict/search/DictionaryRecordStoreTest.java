@@ -85,4 +85,20 @@ public class DictionaryRecordStoreTest {
         preferences.edit().putString("history_v1", "not-json").commit();
         assertTrue(store.history().isEmpty());
     }
+
+    @Test
+    public void cachedSnapshotsFollowWritesFromAnotherInstance() {
+        store.history();
+        store.favorites();
+        DictionaryRecordStore other = new DictionaryRecordStore(context);
+        other.recordSearch("山口", 1, 7, 400L);
+        other.toggleFavorite(DictionaryRecordStore.FavoriteEntry.create(
+                "日头", "ŋit³¹ heu²¹", "太陽", "通用字表", 1, 400L));
+
+        assertEquals("山口", store.history().get(0).query);
+        assertTrue(store.isFavorite(other.favorites().get(0).key));
+
+        store.clearHistory();
+        assertTrue(other.history().isEmpty());
+    }
 }

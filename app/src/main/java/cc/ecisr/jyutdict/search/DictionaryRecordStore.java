@@ -10,7 +10,9 @@ import org.json.JSONObject;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 /** Persistent local search history and bookmarked dictionary snapshots. */
@@ -22,21 +24,31 @@ public final class DictionaryRecordStore {
     public static final int MAX_FAVORITES = 500;
 
     private final SharedPreferences preferences;
+    private String cachedHistoryRaw;
+    private List<HistoryEntry> cachedHistory = Collections.emptyList();
+    private String cachedFavoritesRaw;
+    private List<FavoriteEntry> cachedFavorites = Collections.emptyList();
+    private Set<String> cachedFavoriteKeys = Collections.emptySet();
 
     public DictionaryRecordStore(Context context) {
         preferences = context.getApplicationContext()
                 .getSharedPreferences(PREFS, Context.MODE_PRIVATE);
     }
 
-    public List<HistoryEntry> history() {
-        JSONArray array = readArray(KEY_HISTORY);
-        ArrayList<HistoryEntry> result = new ArrayList<>(array.length());
-        for (int index = 0; index < array.length(); index++) {
-            JSONObject json = array.optJSONObject(index);
-            HistoryEntry entry = HistoryEntry.fromJson(json);
-            if (entry != null) result.add(entry);
+    public synchronized List<HistoryEntry> history() {
+        String raw = storedArray(KEY_HISTORY);
+        if (!raw.equals(cachedHistoryRaw)) {
+            cachedHistoryRaw = raw;
+            JSONArray array = readArray(raw);
+            ArrayList<HistoryEntry> result = new ArrayList<>(array.length());
+            for (int index = 0; index < array.length(); index++) {
+                JSONObject json = array.optJSONObject(index);
+                HistoryEntry entry = HistoryEntry.fromJson(json);
+                if (entry != null) result.add(entry);
+            }
+            cachedHistory = Collections.unmodifiableList(result);
         }
-        return result;
+        return cachedHistory;
     }
 
     public void recordSearch(String query, int mode, int resultCount, long timestamp) {
@@ -53,11 +65,13 @@ public final class DictionaryRecordStore {
         }
         history.add(0, new HistoryEntry(displayQuery, mode, resultCount, timestamp));
         while (history.size() > MAX_HISTORY) history.remove(history.size() - 1);
-        writeArray(KEY_HISTORY, toHistoryJson(history));
+        writeHistory(history);
     }
 
-    public void clearHistory() {
+    public synchronized void clearHistory() {
         preferences.edit().remove(KEY_HISTORY).apply();
+        cachedHistoryRaw = null;
+        cachedHistory = Collections.emptyList();
     }
 
     public void removeHistory(HistoryEntry target) {
@@ -65,31 +79,40 @@ public final class DictionaryRecordStore {
         for (int index = history.size() - 1; index >= 0; index--) {
             if (history.get(index).id().equals(target.id())) history.remove(index);
         }
-        writeArray(KEY_HISTORY, toHistoryJson(history));
+        writeHistory(history);
     }
 
-    public List<FavoriteEntry> favorites() {
-        JSONArray array = readArray(KEY_FAVORITES);
-        ArrayList<FavoriteEntry> result = new ArrayList<>(array.length());
-        for (int index = 0; index < array.length(); index++) {
-            JSONObject json = array.optJSONObject(index);
-            FavoriteEntry entry = FavoriteEntry.fromJson(json);
-            if (entry != null) result.add(entry);
-        }
-        Collections.sort(result, new Comparator<FavoriteEntry>() {
-            @Override
-            public int compare(FavoriteEntry left, FavoriteEntry right) {
-                return Long.compare(right.savedAt, left.savedAt);
+    public synchronized List<FavoriteEntry> favorites() {
+        String raw = storedArray(KEY_FAVORITES);
+        if (!raw.equals(cachedFavoritesRaw)) {
+            cachedFavoritesRaw = raw;
+            JSONArray array = readArray(raw);
+            ArrayList<FavoriteEntry> result = new ArrayList<>(array.length());
+            HashSet<String> keys = new HashSet<>();
+            for (int index = 0; index < array.length(); index++) {
+                JSONObject json = array.optJSONObject(index);
+                FavoriteEntry entry = FavoriteEntry.fromJson(json);
+                if (entry != null) {
+                    result.add(entry);
+                    keys.add(entry.key);
+                }
             }
-        });
-        return result;
+            Collections.sort(result, new Comparator<FavoriteEntry>() {
+                @Override
+                public int compare(FavoriteEntry left, FavoriteEntry right) {
+                    return Long.compare(right.savedAt, left.savedAt);
+                }
+            });
+            cachedFavorites = Collections.unmodifiableList(result);
+            cachedFavoriteKeys = Collections.unmodifiableSet(keys);
+        }
+        return cachedFavorites;
     }
 
-    public boolean isFavorite(String key) {
-        for (FavoriteEntry entry : favorites()) {
-            if (entry.key.equals(key)) return true;
-        }
-        return false;
+    public synchronized boolean isFavorite(String key) {
+        if (key == null || key.isEmpty()) return false;
+        favorites();
+        return cachedFavoriteKeys.contains(key);
     }
 
     public boolean toggleFavorite(FavoriteEntry entry) {
@@ -98,13 +121,13 @@ public final class DictionaryRecordStore {
         for (int index = 0; index < favorites.size(); index++) {
             if (favorites.get(index).key.equals(entry.key)) {
                 favorites.remove(index);
-                writeArray(KEY_FAVORITES, toFavoriteJson(favorites));
+                writeFavorites(favorites);
                 return false;
             }
         }
         favorites.add(0, entry);
         while (favorites.size() > MAX_FAVORITES) favorites.remove(favorites.size() - 1);
-        writeArray(KEY_FAVORITES, toFavoriteJson(favorites));
+        writeFavorites(favorites);
         return true;
     }
 
@@ -113,20 +136,41 @@ public final class DictionaryRecordStore {
         for (int index = favorites.size() - 1; index >= 0; index--) {
             if (favorites.get(index).key.equals(target.key)) favorites.remove(index);
         }
-        writeArray(KEY_FAVORITES, toFavoriteJson(favorites));
+        writeFavorites(favorites);
     }
 
-    private JSONArray readArray(String key) {
+    private String storedArray(String key) {
         String raw = preferences.getString(key, "[]");
+        return raw == null ? "[]" : raw;
+    }
+
+    private static JSONArray readArray(String raw) {
         try {
-            return new JSONArray(raw == null ? "[]" : raw);
+            return new JSONArray(raw);
         } catch (JSONException ignored) {
             return new JSONArray();
         }
     }
 
-    private void writeArray(String key, JSONArray value) {
-        preferences.edit().putString(key, value.toString()).apply();
+    private void writeHistory(List<HistoryEntry> entries) {
+        String stored = toHistoryJson(entries).toString();
+        synchronized (this) {
+            cachedHistoryRaw = stored;
+            cachedHistory = Collections.unmodifiableList(new ArrayList<>(entries));
+            preferences.edit().putString(KEY_HISTORY, stored).apply();
+        }
+    }
+
+    private void writeFavorites(List<FavoriteEntry> entries) {
+        String stored = toFavoriteJson(entries).toString();
+        synchronized (this) {
+            HashSet<String> keys = new HashSet<>();
+            for (FavoriteEntry entry : entries) keys.add(entry.key);
+            cachedFavoritesRaw = stored;
+            cachedFavorites = Collections.unmodifiableList(new ArrayList<>(entries));
+            cachedFavoriteKeys = Collections.unmodifiableSet(keys);
+            preferences.edit().putString(KEY_FAVORITES, stored).apply();
+        }
     }
 
     private static JSONArray toHistoryJson(List<HistoryEntry> entries) {

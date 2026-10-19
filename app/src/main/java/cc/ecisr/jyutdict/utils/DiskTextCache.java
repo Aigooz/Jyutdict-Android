@@ -12,6 +12,9 @@ import java.io.OutputStreamWriter;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
 /**
  * 可跨進程重啟、亦可由系統按空間需要清理的文字快取。
@@ -19,6 +22,8 @@ import java.security.NoSuchAlgorithmException;
  */
 public final class DiskTextCache {
     private static final String DIRECTORY = "readonly_http";
+    private static final long MAX_AGE_MILLIS = 30L * 24 * 60 * 60 * 1000;
+    private static final long MAX_TOTAL_BYTES = 32L * 1024 * 1024;
 
     private DiskTextCache() {
     }
@@ -47,7 +52,15 @@ public final class DiskTextCache {
             return false;
         }
         if (target.exists() && !target.delete()) return false;
-        return temporary.renameTo(target);
+        boolean stored = temporary.renameTo(target);
+        trim(directory);
+        return stored;
+    }
+
+    /** Drops one cached entry, e.g. when its owning screen is finished for good. */
+    public static void remove(Context context, String key) {
+        File file = fileFor(context, key);
+        if (file.isFile()) file.delete();
     }
 
     /** Clears only the recreatable read-only HTTP cache owned by this helper. */
@@ -61,6 +74,33 @@ public final class DiskTextCache {
         }
         if (directory.isDirectory()) directory.delete();
         return deleted;
+    }
+
+    private static void trim(File directory) {
+        File[] files = directory.listFiles();
+        if (files == null) return;
+        long now = System.currentTimeMillis();
+        long total = 0;
+        for (File file : files) {
+            if (!file.isFile()) continue;
+            if (now - file.lastModified() > MAX_AGE_MILLIS) {
+                file.delete();
+                continue;
+            }
+            total += file.length();
+        }
+        if (total <= MAX_TOTAL_BYTES) return;
+        List<File> survivors = new ArrayList<>();
+        for (File file : files) {
+            if (file.isFile()) survivors.add(file);
+        }
+        Collections.sort(survivors, (left, right) -> Long.compare(left.lastModified(),
+                right.lastModified()));
+        for (File file : survivors) {
+            if (total <= MAX_TOTAL_BYTES) break;
+            long size = file.length();
+            if (file.delete()) total -= size;
+        }
     }
 
     private static String read(File file) {
