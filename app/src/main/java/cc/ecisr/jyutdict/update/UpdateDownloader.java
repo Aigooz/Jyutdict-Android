@@ -2,7 +2,11 @@ package cc.ecisr.jyutdict.update;
 
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageInfo;
+import android.content.pm.PackageManager;
+import android.content.pm.Signature;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
@@ -17,6 +21,7 @@ import java.io.BufferedOutputStream;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.security.MessageDigest;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.LinkedHashSet;
@@ -25,6 +30,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
+import cc.ecisr.jyutdict.BuildConfig;
 import cc.ecisr.jyutdict.utils.LocaleUtil;
 
 public final class UpdateDownloader {
@@ -34,6 +40,7 @@ public final class UpdateDownloader {
     private static final int DOWNLOAD_ATTEMPTS = 3;
     private static final int BUFFER_SIZE = 65536;
     private static final int PROGRESS_STEP = 65536;
+    private static final int MAX_CHECKSUM_BYTES = 65536;
     private static final Pattern CONTENT_RANGE_PATTERN = Pattern.compile(
             "bytes\\s+(\\d+)-(\\d+)/(\\d+)");
 
@@ -57,7 +64,16 @@ public final class UpdateDownloader {
         if (!release.hasAsset() || release.assetSize() <= 0) return false;
         File directory = updateDirectory(context);
         File destination = new File(directory, release.assetName());
-        return destination.exists() && destination.length() == release.assetSize();
+        if (!destination.exists() || destination.length() != release.assetSize()) {
+            return false;
+        }
+        try {
+            validateDownloadedApk(context, release, destination);
+            return true;
+        } catch (Exception exception) {
+            destination.delete();
+            return false;
+        }
     }
 
     /** Downloads the APK without launching the installer; for background use. */
@@ -121,7 +137,12 @@ public final class UpdateDownloader {
         File destination = new File(directory, release.assetName());
         if (release.assetSize() > 0 && destination.exists()
                 && destination.length() == release.assetSize()) {
-            return destination;
+            try {
+                validateDownloadedApk(context, release, destination);
+                return destination;
+            } catch (Exception exception) {
+                destination.delete();
+            }
         }
         File partial = new File(directory, partialName(release));
         clearOldFiles(directory, partial.getName());
@@ -136,7 +157,7 @@ public final class UpdateDownloader {
         Exception lastException = null;
         for (String url : urls) {
             try {
-                return downloadWithRetry(directory, url, release, callback);
+                return downloadWithRetry(context, directory, url, release, callback);
             } catch (Exception exception) {
                 if (Thread.currentThread().isInterrupted()
                         || exception instanceof InterruptedIOException) {
@@ -151,7 +172,7 @@ public final class UpdateDownloader {
         : lastException;
     }
 
-    private static File downloadWithRetry(File directory, String url,
+    private static File downloadWithRetry(Context context, File directory, String url,
                                           AppUpdateClient.ReleaseInfo release,
                                           ProgressCallback callback)
             throws Exception {
@@ -161,7 +182,7 @@ public final class UpdateDownloader {
                 throw new InterruptedIOException("Download cancelled");
             }
             try {
-                return downloadFrom(directory, url, release, callback);
+                return downloadFrom(context, directory, url, release, callback);
             } catch (Exception exception) {
                 if (Thread.currentThread().isInterrupted()
                         || exception instanceof InterruptedIOException) {
@@ -184,7 +205,7 @@ public final class UpdateDownloader {
                 : lastException;
     }
 
-    private static File downloadFrom(File directory, String url,
+    private static File downloadFrom(Context context, File directory, String url,
                                      AppUpdateClient.ReleaseInfo release,
                                      ProgressCallback callback)
             throws Exception {
@@ -196,7 +217,7 @@ public final class UpdateDownloader {
             existingBytes = 0;
         }
         if (release.assetSize() > 0 && existingBytes == release.assetSize()) {
-            return finalizeDownload(partial, destination);
+            return finalizeDownload(context, partial, destination, release);
         }
         boolean resuming = existingBytes > 0;
 
@@ -215,13 +236,13 @@ public final class UpdateDownloader {
             int status = connection.getResponseCode();
             if (status == HttpURLConnection.HTTP_OK && resuming) {
                 partial.delete();
-                return downloadFrom(directory, url, release, callback);
+                return downloadFrom(context, directory, url, release, callback);
             }
             if (status == HttpURLConnection.HTTP_PARTIAL && resuming) {
                 Matcher range = contentRange(connection.getHeaderField("Content-Range"));
                 if (range == null || Long.parseLong(range.group(1)) != existingBytes) {
                     partial.delete();
-                    return downloadFrom(directory, url, release, callback);
+                    return downloadFrom(context, directory, url, release, callback);
                 }
             } else if (status != HttpURLConnection.HTTP_OK) {
                 throw new IllegalStateException("HTTP " + status);
@@ -265,17 +286,131 @@ public final class UpdateDownloader {
                             + "/" + totalBytes);
                 }
             }
-            return finalizeDownload(partial, destination);
+            return finalizeDownload(context, partial, destination, release);
         } finally {
             if (connection != null) connection.disconnect();
         }
     }
 
-    private static File finalizeDownload(File partial, File destination) throws Exception {
+    private static File finalizeDownload(Context context, File partial, File destination,
+                                         AppUpdateClient.ReleaseInfo release)
+            throws Exception {
+        validateDownloadedApk(context, release, partial);
+        if (destination.exists()) destination.delete();
         if (!partial.renameTo(destination)) {
             throw new IllegalStateException("Cannot finalize update file");
         }
         return destination;
+    }
+
+    private static void validateDownloadedApk(
+            Context context, AppUpdateClient.ReleaseInfo release, File apk) throws Exception {
+        long releaseSize = release.assetSize();
+        if (releaseSize <= 0 || apk.length() != releaseSize) {
+            throw new IllegalStateException("APK length mismatch");
+        }
+        String expectedDigest = fetchChecksumDigest(context, release);
+        String actualDigest = UpdateIntegrity.sha256(apk);
+        if (!MessageDigest.isEqual(
+                expectedDigest.getBytes(java.nio.charset.StandardCharsets.US_ASCII),
+                actualDigest.getBytes(java.nio.charset.StandardCharsets.US_ASCII))) {
+            throw new IllegalStateException(
+                    context.getString(cc.ecisr.jyutdict.R.string.version_checksum_failed));
+        }
+
+        PackageManager manager = context.getPackageManager();
+        int flags = packageSignatureFlags();
+        PackageInfo archive = manager.getPackageArchiveInfo(apk.getAbsolutePath(), flags);
+        PackageInfo installed = manager.getPackageInfo(context.getPackageName(), flags);
+        if (archive == null || !context.getPackageName().equals(archive.packageName)
+                || !isNotDowngrade(archive.versionCode, installed.versionCode)) {
+            throw new IllegalStateException(
+                    context.getString(cc.ecisr.jyutdict.R.string.version_package_invalid));
+        }
+        if (!sameSigner(archive, installed)) {
+            throw new IllegalStateException(
+                    context.getString(cc.ecisr.jyutdict.R.string.version_package_invalid));
+        }
+    }
+
+    private static String fetchChecksumDigest(
+            Context context, AppUpdateClient.ReleaseInfo release)
+            throws Exception {
+        if (release.checksumSize() > MAX_CHECKSUM_BYTES) {
+            throw new IllegalStateException("Checksum manifest is too large");
+        }
+        Set<String> urls = new LinkedHashSet<>();
+        if (release.checksumDownloadUrl() != null && !release.checksumDownloadUrl().isEmpty()) {
+            urls.add(release.checksumDownloadUrl());
+        }
+        if (release.checksumApiUrl() != null && !release.checksumApiUrl().isEmpty()) {
+            urls.add(release.checksumApiUrl());
+        }
+        if (urls.isEmpty()) {
+            throw new IllegalStateException(
+                    context.getString(cc.ecisr.jyutdict.R.string.version_checksum_missing));
+        }
+        Exception last = null;
+        for (String url : urls) {
+            HttpURLConnection connection = null;
+            try {
+                connection = (HttpURLConnection) new URL(url).openConnection();
+                connection.setConnectTimeout(8000);
+                connection.setReadTimeout(20000);
+                connection.setUseCaches(false);
+                connection.setRequestProperty("User-Agent", "Jyutdict-Android-Update");
+                connection.setRequestProperty("Accept", "text/plain");
+                int status = connection.getResponseCode();
+                if (status != HttpURLConnection.HTTP_OK) {
+                    throw new IllegalStateException("Checksum HTTP " + status);
+                }
+                String manifest = UpdateIntegrity.readLimitedUtf8(
+                        connection.getInputStream(), MAX_CHECKSUM_BYTES);
+                String digest = UpdateIntegrity.digestForAsset(manifest, release.assetName());
+                if (digest == null) {
+                    throw new IllegalStateException(
+                            "Checksum entry is missing for " + release.assetName());
+                }
+                return digest;
+            } catch (Exception exception) {
+                last = exception;
+            } finally {
+                if (connection != null) connection.disconnect();
+            }
+        }
+        throw last == null
+                ? new IllegalStateException("Checksum manifest is unavailable")
+                : last;
+    }
+
+    private static boolean sameSigner(PackageInfo archive, PackageInfo installed)
+            throws Exception {
+        byte[] archiveDigest = signerDigest(archive);
+        byte[] installedDigest = signerDigest(installed);
+        return archiveDigest != null && installedDigest != null
+                && MessageDigest.isEqual(archiveDigest, installedDigest);
+    }
+
+    private static byte[] signerDigest(PackageInfo info) throws Exception {
+        Signature[] signatures = packageSignatures(info);
+        if (signatures.length == 0) return null;
+        return MessageDigest.getInstance("SHA-256").digest(signatures[0].toByteArray());
+    }
+
+    private static int packageSignatureFlags() {
+        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.P
+                ? PackageManager.GET_SIGNING_CERTIFICATES
+                : PackageManager.GET_SIGNATURES;
+    }
+
+    @SuppressWarnings("deprecation")
+    static Signature[] packageSignatures(PackageInfo info) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            if (info.signingInfo == null) return new Signature[0];
+            Signature[] signatures = info.signingInfo.getApkContentsSigners();
+            return signatures == null ? new Signature[0] : signatures;
+        }
+        return info.signatures == null ? new Signature[0] : info.signatures;
     }
 
     static long contentLength(String header) {
@@ -285,6 +420,10 @@ public final class UpdateDownloader {
         } catch (NumberFormatException exception) {
             return -1;
         }
+    }
+
+    static boolean isNotDowngrade(int candidateVersionCode, int installedVersionCode) {
+        return candidateVersionCode >= installedVersionCode;
     }
 
     private static String partialName(AppUpdateClient.ReleaseInfo release) {

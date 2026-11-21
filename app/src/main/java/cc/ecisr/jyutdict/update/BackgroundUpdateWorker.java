@@ -28,6 +28,9 @@ public final class BackgroundUpdateWorker extends Worker {
     private static final String KEY_ASSET_API_URL = "asset_api_url";
     private static final String KEY_ASSET_DOWNLOAD_URL = "asset_download_url";
     private static final String KEY_ASSET_SIZE = "asset_size";
+    private static final String KEY_CHECKSUM_API_URL = "checksum_api_url";
+    private static final String KEY_CHECKSUM_DOWNLOAD_URL = "checksum_download_url";
+    private static final String KEY_CHECKSUM_SIZE = "checksum_size";
 
     public BackgroundUpdateWorker(@NonNull Context context,
                                   @NonNull WorkerParameters params) {
@@ -43,6 +46,9 @@ public final class BackgroundUpdateWorker extends Worker {
                 .putString(KEY_ASSET_API_URL, release.assetApiUrl())
                 .putString(KEY_ASSET_DOWNLOAD_URL, release.assetDownloadUrl())
                 .putLong(KEY_ASSET_SIZE, release.assetSize())
+                .putString(KEY_CHECKSUM_API_URL, release.checksumApiUrl())
+                .putString(KEY_CHECKSUM_DOWNLOAD_URL, release.checksumDownloadUrl())
+                .putLong(KEY_CHECKSUM_SIZE, release.checksumSize())
                 .build();
         OneTimeWorkRequest request = new OneTimeWorkRequest.Builder(BackgroundUpdateWorker.class)
                 .setConstraints(new Constraints.Builder()
@@ -113,6 +119,9 @@ public final class BackgroundUpdateWorker extends Worker {
                 input.getString(KEY_ASSET_API_URL),
                 input.getString(KEY_ASSET_DOWNLOAD_URL),
                 input.getLong(KEY_ASSET_SIZE, 0),
+                input.getString(KEY_CHECKSUM_API_URL),
+                input.getString(KEY_CHECKSUM_DOWNLOAD_URL),
+                input.getLong(KEY_CHECKSUM_SIZE, 0),
                 ""
         );
     }

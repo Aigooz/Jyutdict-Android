@@ -57,6 +57,7 @@ import cc.ecisr.jyutdict.databinding.DialogLocationPickerBinding;
 import cc.ecisr.jyutdict.databinding.LocationPickerItemBinding;
 import cc.ecisr.jyutdict.search.DictionaryRecordStore;
 import cc.ecisr.jyutdict.search.SearchQueryNormalizer;
+import cc.ecisr.jyutdict.search.SearchRequestFactory;
 import cc.ecisr.jyutdict.search.SearchViewModel;
 import cc.ecisr.jyutdict.search.SearchViewModel.Request;
 import cc.ecisr.jyutdict.struct.FjbHeaderInfo;
@@ -67,7 +68,6 @@ import cc.ecisr.jyutdict.utils.ChineseTextConverter;
 import cc.ecisr.jyutdict.utils.ColorUtil;
 import cc.ecisr.jyutdict.utils.DiskTextCache;
 import cc.ecisr.jyutdict.utils.ImmersiveBarUtil;
-import cc.ecisr.jyutdict.utils.JyutpingUtil;
 import cc.ecisr.jyutdict.utils.MotionUtil;
 import cc.ecisr.jyutdict.utils.StringUtil;
 import cc.ecisr.jyutdict.utils.HttpUtil;
@@ -797,7 +797,7 @@ public class MainActivity extends LocalizedActivity {
                     pendingHistoryQuery = "";
                     pendingHistoryMode = 0;
                     showRequestError(state.error);
-                    if (resultFragment != null) resultFragment.showNetworkError();
+                    if (resultFragment != null) resultFragment.showRequestError(state.error);
                     finishSearchUi();
                     break;
                 case IDLE:
@@ -807,14 +807,44 @@ public class MainActivity extends LocalizedActivity {
         });
     }
 
-    private void showRequestError(Object errorObject) {
-        if (errorObject instanceof HttpUtil.RequestError
-                && ((HttpUtil.RequestError) errorObject).kind() == HttpUtil.ErrorKind.TIMEOUT) {
+    private void showRequestError(HttpUtil.RequestError error) {
+        if (error == null) {
             ToastUtil.msg(this, getString(R.string.error_tips_network_out_of_time));
             return;
         }
-        String errorCode = errorObject == null ? "network" : errorObject.toString();
-        ToastUtil.msg(this, getString(R.string.error_tips_network, errorCode));
+        if (error.kind() == HttpUtil.ErrorKind.TIMEOUT
+                || error.kind() == HttpUtil.ErrorKind.NETWORK) {
+            ToastUtil.msg(this, getString(R.string.error_tips_network_out_of_time));
+            return;
+        }
+        switch (error.kind()) {
+            case HTTP:
+                ToastUtil.msg(this, getString(R.string.error_tips_server, error.statusCode()));
+                break;
+            case INVALID_REQUEST:
+                ToastUtil.msg(this, getString(R.string.search_error_invalid_query));
+                break;
+            case RESPONSE_TOO_LARGE:
+                ToastUtil.msg(this, getString(R.string.error_tips_data));
+                break;
+            case TIMEOUT:
+            case NETWORK:
+            default:
+                ToastUtil.msg(this, getString(R.string.error_tips_network_out_of_time));
+                break;
+        }
+    }
+
+    private static int validationMessage(SearchRequestFactory.ValidationError error) {
+        switch (error) {
+            case INVALID_REGEX:
+                return R.string.search_error_invalid_regex;
+            case INVALID_TRIM_QUERY:
+                return R.string.search_error_trim_invalid;
+            case QUERY_TOO_LONG:
+            default:
+                return R.string.search_error_too_long;
+        }
     }
 
     private boolean hasCheckedInfoActivity() {
@@ -1383,79 +1413,32 @@ public class MainActivity extends LocalizedActivity {
             return;
         }
         pendingSearch = false;
-        String input = inputEditText.getText().toString();
-        if (input.isEmpty() && !(isSheetMode() && !switchQueryOptsRev.isChecked())) {
+        SearchRequestFactory.RequestOptions requestOptions =
+                new SearchRequestFactory.RequestOptions()
+                        .setSheetMode(isSheetMode())
+                        .setReverseSearch(switchQueryOptsRev.isChecked())
+                        .setRegexMode(switchQueryOptsRegex.isChecked())
+                        .setConciseReverseSearch(sp.getBoolean("reverse_search_concise", true))
+                        .setSelectedColumn(selectedLocationColumn())
+                        .setBookFilter(pronunciationBookFilter());
+        SearchRequestFactory.CreateResult createResult = SearchRequestFactory.createChecked(
+                URL_API_ROOT, inputEditText.getText().toString(), requestOptions,
+                queryingModeConfig);
+        if (createResult.error != null) {
+            searchViewModel.cancel();
+            pendingHistoryQuery = "";
+            pendingHistoryMode = 0;
+            finishSearchUi();
+            resultFragment.showInvalidRequest();
+            ToastUtil.msg(this, getString(validationMessage(createResult.error)));
             return;
-        } // 搜索欄爲空時不檢索
-        boolean regexMode = isSheetMode() && switchQueryOptsRegex.isChecked();
-        String searchInput = regexMode ? input : SearchQueryNormalizer.matchKey(input);
-        String historyQuery = input.trim();
-
-        ApiUrlBuilder url;
-        int modeSnapshot;
-        if (isSheetMode()) { // 檢索泛粵字表
-            modeSnapshot = QUERYING_SHEET;
-            url = ApiUrlBuilder.from(URL_API_ROOT, "sheet");
-            if (searchInput.isEmpty() && !switchQueryOptsRev.isChecked()) {
-                url.add("random", 10);
-            } else {
-                url.add("q", searchInput);
-                boolean pronunciationInput = StringUtil.isSheetPronunciationInput(searchInput)
-                        && !switchQueryOptsRev.isChecked();
-                String sheetMode;
-                if (pronunciationInput) {
-                    sheetMode = "trim";
-                } else if (switchQueryOptsRev.isChecked()) {
-                    sheetMode = sp.getBoolean("reverse_search_concise", true)
-                            ? "concise" : "meaning";
-                } else {
-                    sheetMode = "fuzzy";
-                }
-                if (regexMode) {
-                    sheetMode = "regex";
-                }
-                url.add("mode", sheetMode);
-
-                LocationOption selectedLocation = getSelectedLocationOption();
-                String selectedColumn = selectedLocation == null
-                        ? FjbHeaderInfo.COLUMN_NAME_RETRIEVAL
-                        : selectedLocation.queryColumn;
-
-                // 漢字必須交由 API 自動選擇字頭列；只有查音纔傳讀音列。
-                if (pronunciationInput
-                        && !FjbHeaderInfo.COLUMN_NAME_PRONUNCIATION.equals(selectedColumn)) {
-                    url.add("col", selectedColumn);
-                }
-            }
-        } else { // 檢索通用字表
-            url = ApiUrlBuilder.from(URL_API_ROOT, "detail");
-            String jyutpingInput = SearchQueryNormalizer.normalizeJyutping(searchInput);
-            if (StringUtil.isJyutpingInput(jyutpingInput)) { // 音（允許空格作模糊佔位）
-                String[] parts = JyutpingUtil.parseJyutpingQuery(jyutpingInput);
-                if (parts != null) {
-                    modeSnapshot = QUERYING_PRON;
-                    url.add("in", parts[0])
-                            .add("nu", parts[1])
-                            .add("co", parts[2]);
-                    if (parts[3] != null && !parts[3].isEmpty()) {
-                        url.add("to", parts[3]);
-                    }
-                    addPronunciationBookFilter(url);
-                } else {
-                    // 解析失敗，回退為查字模式
-                    modeSnapshot = QUERYING_CHARA;
-                    url.add("chara", searchInput);
-                }
-            } else { // 字
-                modeSnapshot = QUERYING_CHARA;
-                url.add("chara", searchInput);
-            }
         }
-        int responseMode = modeSnapshot | queryingModeConfig;
-        pendingHistoryQuery = historyQuery;
-        pendingHistoryMode = responseMode;
-        resultFragment.configureRecords(recordStore, responseMode);
-        searchViewModel.search(new Request(url.build(), responseMode));
+        SearchRequestFactory.SearchRequest searchRequest = createResult.request;
+        if (searchRequest == null) return;
+        pendingHistoryQuery = searchRequest.historyQuery;
+        pendingHistoryMode = searchRequest.responseMode;
+        resultFragment.configureRecords(recordStore, searchRequest.responseMode);
+        searchViewModel.search(new Request(searchRequest.url, searchRequest.responseMode));
         saveLayoutStatus();
     }
 
@@ -1501,16 +1484,23 @@ public class MainActivity extends LocalizedActivity {
         search();
     }
 
-    private void addPronunciationBookFilter(ApiUrlBuilder url) {
+    private String selectedLocationColumn() {
+        LocationOption selectedLocation = getSelectedLocationOption();
+        return selectedLocation == null
+                ? FjbHeaderInfo.COLUMN_NAME_RETRIEVAL : selectedLocation.queryColumn;
+    }
+
+    private SearchRequestFactory.BookFilter pronunciationBookFilter() {
         boolean hidesFanwan = ResultFragment.pronBookFilter.contains("分韻");
         boolean hidesJingwaa = ResultFragment.pronBookFilter.contains("英華");
         if (hidesFanwan && hidesJingwaa) {
-            url.add("wanshyu", "none");
+            return SearchRequestFactory.BookFilter.NONE;
         } else if (hidesFanwan) {
-            url.add("wanshyu", "jingwaa");
+            return SearchRequestFactory.BookFilter.JINGWAA_ONLY;
         } else if (hidesJingwaa) {
-            url.add("wanshyu", "fanwan");
+            return SearchRequestFactory.BookFilter.FANWAN_ONLY;
         }
+        return SearchRequestFactory.BookFilter.ALL;
     }
 
     private final ActivityResultLauncher<Intent> startActivitySetting = registerForActivityResult(

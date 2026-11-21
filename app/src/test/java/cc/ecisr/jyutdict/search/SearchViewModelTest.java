@@ -3,6 +3,7 @@ package cc.ecisr.jyutdict.search;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertSame;
+import static org.junit.Assert.assertTrue;
 
 import androidx.arch.core.executor.testing.InstantTaskExecutorRule;
 
@@ -58,8 +59,73 @@ public class SearchViewModelTest {
         assertSame(error, failure.error);
     }
 
+    @Test
+    public void cancelIsForwardedToTheTransport() {
+        FakeClient dataSource = new FakeClient();
+        SearchViewModel viewModel = new SearchViewModel(dataSource);
+
+        viewModel.cancel();
+
+        assertTrue(dataSource.cancelled);
+        SearchViewModel.State idle = viewModel.getUiState().getValue();
+        assertNotNull(idle);
+        assertEquals(SearchViewModel.Status.IDLE, idle.status);
+    }
+
+    @Test
+    public void cancelDropsLateTransportCallbacks() {
+        FakeClient dataSource = new FakeClient();
+        SearchViewModel viewModel = new SearchViewModel(dataSource);
+        SearchViewModel.Request request =
+                new SearchViewModel.Request("https://example.test/search", 17);
+
+        viewModel.search(request);
+        viewModel.cancel();
+        dataSource.succeed("stale result");
+
+        SearchViewModel.State afterSuccess = viewModel.getUiState().getValue();
+        assertNotNull(afterSuccess);
+        assertEquals(SearchViewModel.Status.IDLE, afterSuccess.status);
+
+        dataSource.fail(new HttpUtil.RequestError(
+                HttpUtil.ErrorKind.NETWORK, 0, "stale failure"));
+
+        SearchViewModel.State afterFailure = viewModel.getUiState().getValue();
+        assertNotNull(afterFailure);
+        assertEquals(SearchViewModel.Status.IDLE, afterFailure.status);
+    }
+
+    @Test
+    public void newerRequestDropsCallbacksFromOlderRequest() {
+        FakeClient dataSource = new FakeClient();
+        SearchViewModel viewModel = new SearchViewModel(dataSource);
+        SearchViewModel.Request first =
+                new SearchViewModel.Request("https://example.test/first", 17);
+        SearchViewModel.Request second =
+                new SearchViewModel.Request("https://example.test/second", 23);
+
+        viewModel.search(first);
+        HttpUtil.Callback firstCallback = dataSource.callback;
+        viewModel.search(second);
+
+        firstCallback.onSuccess("stale result");
+
+        SearchViewModel.State state = viewModel.getUiState().getValue();
+        assertNotNull(state);
+        assertEquals(SearchViewModel.Status.LOADING, state.status);
+        assertSame(second, state.request);
+
+        dataSource.succeed("current result");
+        state = viewModel.getUiState().getValue();
+        assertNotNull(state);
+        assertEquals(SearchViewModel.Status.SUCCESS, state.status);
+        assertSame(second, state.request);
+        assertEquals("current result", state.responseBody);
+    }
+
     private static final class FakeClient implements SearchViewModel.Client {
         private HttpUtil.Callback callback;
+        private boolean cancelled;
 
         @Override
         public void search(String url, HttpUtil.Callback callback) {
@@ -68,6 +134,7 @@ public class SearchViewModelTest {
 
         @Override
         public void cancel() {
+            cancelled = true;
         }
 
         void succeed(String responseBody) {

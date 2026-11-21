@@ -18,7 +18,7 @@ import java.util.Locale;
 import java.util.zip.GZIPInputStream;
 
 /** Small cancellable GET client which always delivers its latest result on the main thread. */
-public final class HttpUtil {
+public class HttpUtil {
     private static final String TAG = "HttpUtil";
     /** Characters buffered from one response; dictionary payloads stay far below this. */
     private static final int MAX_RESPONSE_CHARS = 4_000_000;

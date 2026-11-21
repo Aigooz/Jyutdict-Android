@@ -152,6 +152,13 @@ public class ResultItemAdapter extends RecyclerView.Adapter<ResultItemAdapter.Li
         refreshFavoriteKeys();
     }
 
+    void clearItems() {
+        if (items.isEmpty()) return;
+        items.clear();
+        refreshFavoriteKeys();
+        notifyDataSetChanged();
+    }
+
     ResultInfo getItem(int position) {
         return items.get(position);
     }
@@ -432,10 +439,6 @@ public class ResultItemAdapter extends RecyclerView.Adapter<ResultItemAdapter.Li
             }
         }
 
-        ResultInfo.CommentTarget getCommentTarget() {
-            return currentItem.commentTarget;
-        }
-
         CharSequence getWanshyuText() {
             return currentItem.rightTop.toString();
         }
@@ -491,33 +494,18 @@ public class ResultItemAdapter extends RecyclerView.Adapter<ResultItemAdapter.Li
         static final int TYPE_GENERAL = 0, TYPE_SHEET = 1;
         final Spanned chara, leftMiddle, leftBottom, rightTop, rightBottom;
         final int type;
-        final CommentTarget commentTarget;
         List<PronunciationOption> pronunciations = Collections.emptyList();
         String cachedFavoriteKey;
         int cachedFavoriteMode = -1;
 
         ResultInfo(Spanned chara, Spanned leftMiddle, Spanned leftBottom,
-                   Spanned rightTop, Spanned rightBottom, int type,
-                   String commentType, String commentTarget) {
+                   Spanned rightTop, Spanned rightBottom, int type) {
             this.chara = chara;
             this.leftMiddle = leftMiddle;
             this.leftBottom = leftBottom;
             this.rightTop = rightTop;
             this.rightBottom = rightBottom;
             this.type = type;
-            this.commentTarget = commentType == null || commentTarget == null
-                    ? null : new CommentTarget(commentType, commentTarget);
-        }
-
-        static final class CommentTarget {
-            final String type, target;
-            int count;
-            boolean countLoaded;
-
-            CommentTarget(String type, String target) {
-                this.type = type;
-                this.target = target;
-            }
         }
     }
 }

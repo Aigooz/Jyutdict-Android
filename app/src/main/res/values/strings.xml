@@ -68,13 +68,6 @@
     <string name="taishan_original_hide">收起原文</string>
     <string name="taishan_online_play">播放來源錄音</string>
     <string name="taishan_online_open_source">打開 taishandict.com</string>
-    <string name="comment_button">評論</string>
-    <string name="comment_button_count">評論 (%1$d)</string>
-    <string name="comment_dialog_title">評論 · %1$s</string>
-    <string name="comment_empty">暫無評論</string>
-    <string name="comment_deleted">該評論已刪除</string>
-    <string name="comment_meta">%1$s · %2$s</string>
-    <string name="comment_load_failed">載入評論失敗：%1$s</string>
     <string name="result_list_chara">重</string>
     <string name="result_list_info">澄通鍾三開平dryung\n澄通鍾三開上dryungx\n澄通鍾三開去dryungh</string>
     <string name="result_list_extra">U+91CD</string>
@@ -95,6 +88,10 @@
     <string name="search_jyut_sheet">泛粵字表</string>
     <string name="search_reversal">反查釋義</string>
     <string name="search_enable_regex">使用正則</string>
+    <string name="search_error_invalid_query">查詢條件無效，請修改後重試。</string>
+    <string name="search_error_invalid_regex">正則表達式格式不正確或過於複雜，請修改後重試。</string>
+    <string name="search_error_too_long">查詢內容過長，請縮短後重試。</string>
+    <string name="search_error_trim_invalid">查音內容包含不支援的字符，請修改後重試。</string>
     <string name="search_filtering_area">篩選地點</string>
     <string name="search_filtering_area_pron">篩選查音地點</string>
     <string name="search_filtering_area_summary">篩選地點 · %1$s</string>
@@ -133,6 +130,7 @@
     <!-- Toast Message-->
     <string name="error_tips_network">網絡或服務器錯誤，錯誤碼：%1$s</string>
     <string name="error_tips_network_out_of_time">未能連接服務器</string>
+    <string name="error_tips_server">服務器未能完成查詢，HTTP 狀態：%1$d</string>
     <string name="error_tips_data">資料格式已更新，暫時無法顯示</string>
     <string name="tips_no_result">無結果</string>
     <string name="result_initial_title">開始查詢</string>
@@ -169,7 +167,11 @@
     <string name="result_empty_description">可嘗試更換字詞、改用擴展粵拼，或檢查篩選條件。</string>
     <string name="result_error_title">查詢未完成</string>
     <string name="result_error_network">網絡連接不穩定，請確認後重試。</string>
+    <string name="result_error_request">查詢條件無效，請修改後重試。</string>
+    <string name="result_error_server">服務器暫時未能完成查詢，請稍後重試。</string>
     <string name="result_error_data">返回資料暫時無法顯示，請稍後重試。</string>
+    <string name="result_validation_title">未能開始查詢</string>
+    <string name="result_validation_description">輸入內容不符合查詢規則，原有結果已清除；請修改後再試。</string>
     <string name="result_retry">重新查詢</string>
     <string name="pron_audio_unavailable">暫無此讀音音檔</string>
     <string name="pron_audio_failed">讀音播放失敗</string>
@@ -277,6 +279,9 @@
     <string name="version_download_complete">已下載完成，請確認系統安裝提示</string>
     <string name="version_download_cancelled">更新已取消</string>
     <string name="version_download_failed">下載失敗：%1$s</string>
+    <string name="version_checksum_missing">更新包缺少校驗資料，已拒絕安裝</string>
+    <string name="version_checksum_failed">更新包校驗失敗，已拒絕安裝</string>
+    <string name="version_package_invalid">更新包格式、版本或簽名不正確，已拒絕安裝</string>
     <string name="version_download_title">手動下載</string>
     <string name="version_download_github">GitHub · 粤辞公開下載</string>
     <string name="version_link_unavailable">沒有可開啟此連結的應用</string>

@@ -59,6 +59,19 @@ public final class PhonologyHtmlRenderer {
         return html.toString();
     }
 
+    public static String withScrollLeft(String html, int scrollLeft) {
+        if (html == null) return null;
+        String value = String.valueOf(Math.max(scrollLeft, 0));
+        String marker = "var initialState=location.hash||'';";
+        int markerIndex = html.indexOf(marker);
+        if (markerIndex < 0) {
+            return html;
+        }
+        return html.substring(0, markerIndex + marker.length())
+                + "var initialScrollLeft=" + value + ";"
+                + html.substring(markerIndex + marker.length());
+    }
+
     private static String renderSection(JSONObject section, boolean darkMode) {
         JSONArray rules = section.optJSONArray("rules");
         int conditionDepth = 1;
@@ -364,6 +377,18 @@ public final class PhonologyHtmlRenderer {
 
     private static String filterScript() {
         return "(function(){"
+                + "var initialState=location.hash||'';"
+                + "function readState(){"
+                + "var value=initialState.slice(1);initialState='';return value;}"
+                + "function storeState(section){"
+                + "var input=section.querySelector('.table-filter');"
+                + "var wrap=section.querySelector('.table-wrap');"
+                + "var checked=document.querySelector('.tab-radio:checked');"
+                + "var payload=JSON.stringify({tab:checked?checked.id:'tab-0',"
+                + "filter:input?input.value:'',left:wrap?wrap.scrollLeft:0});"
+                + "try{history.replaceState(null,'','#'+encodeURIComponent(payload));}catch(e){}"
+                + "if(window.Android&&Android.onPhonologyScroll)"
+                + "Android.onPhonologyScroll(wrap?wrap.scrollLeft:0);}"
                 + "function remerge(table){"
                 + "var all=Array.prototype.slice.call(table.querySelectorAll('tr.data-row'));"
                 + "var visible=all.filter(function(row){return row.style.display!=='none';});"
@@ -396,7 +421,32 @@ public final class PhonologyHtmlRenderer {
                 + "Array.prototype.forEach.call(table.querySelectorAll('tr.data-row'),function(row){"
                 + "var haystack=row.getAttribute('data-search')||'';"
                 + "row.style.display=!needle||haystack.indexOf(needle)!==-1?'':'none';});"
-                + "remerge(table);});});"
+                + "remerge(table);storeState(section);});});"
+                + "Array.prototype.forEach.call(document.querySelectorAll('.tab-radio'),function(tab){"
+                + "tab.addEventListener('change',function(){"
+                + "var section=document.querySelector('.section-'+tab.id.slice(4));"
+                + "if(section)storeState(section);});});"
+                + "Array.prototype.forEach.call(document.querySelectorAll('.table-wrap'),function(wrap){"
+                + "wrap.addEventListener('scroll',function(){"
+                + "storeState(wrap.closest('.phonology-section'));},{passive:true});});"
+                + "try{"
+                + "var saved=JSON.parse(decodeURIComponent(readState()));"
+                + "var tab=document.getElementById(saved.tab||'');"
+                + "if(tab&&tab.classList.contains('tab-radio'))tab.checked=true;"
+                + "var section=document.querySelector('.section-'+((tab&&tab.id.slice(4))||'0'));"
+                + "if(section){"
+                + "var input=section.querySelector('.table-filter');"
+                + "if(input&&saved.filter){input.value=saved.filter;"
+                + "input.dispatchEvent(new Event('input',{bubbles:true}));}"
+                + "var wrap=section.querySelector('.table-wrap');"
+                + "var left=Number(saved.left)||initialScrollLeft||0;"
+                + "if(wrap&&left){wrap.scrollLeft=left;"
+                + "setTimeout(function(){wrap.scrollLeft=left;},0);}"
+                + "if(wrap&&window.Android&&Android.onPhonologyScroll){"
+                + "Android.onPhonologyScroll(wrap.scrollLeft);"
+                + "wrap.addEventListener('scroll',function(){"
+                + "Android.onPhonologyScroll(wrap.scrollLeft);},{passive:true});}}"
+                + "}catch(e){}"
                 + "})();";
     }
 

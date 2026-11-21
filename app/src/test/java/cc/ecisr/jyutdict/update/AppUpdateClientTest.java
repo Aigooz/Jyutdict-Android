@@ -20,4 +20,5 @@ public class AppUpdateClientTest {
         assertEquals(0, AppUpdateClient.parseBuildNumber("v0.100.1"));
         assertEquals(0, AppUpdateClient.parseBuildNumber("v0.8"));
     }
+
 }

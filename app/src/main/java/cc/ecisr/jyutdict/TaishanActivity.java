@@ -614,8 +614,13 @@ public class TaishanActivity extends LocalizedActivity {
     private void scheduleOnlineSearch(boolean immediate) {
         if (!onlineMode || binding == null) return;
         mainHandler.removeCallbacks(dictionarySearchRequest);
-        cancelDictionarySearch();
-        lastOnlineQuery = "";
+        String query = binding.taishanSearchInput.getText() == null
+                ? "" : binding.taishanSearchInput.getText().toString().trim();
+        String searchKey = onlineSearchKey(query);
+        if (!searchKey.equals(lastOnlineQuery)) {
+            cancelDictionarySearch();
+            lastOnlineQuery = searchKey;
+        }
         if (!immediate && !binding.taishanSearchInput.getText().toString().trim().isEmpty()) {
             mainHandler.postDelayed(dictionarySearchRequest, 450L);
         } else {
@@ -640,10 +645,10 @@ public class TaishanActivity extends LocalizedActivity {
             updateOnlineCount(null);
             return;
         }
-        String searchKey = query + "\u0000" + searchField.name() + "\u0000" + partialMatch;
-        if (searchKey.equals(lastOnlineQuery) && dictionaryLookup == null) return;
-        lastOnlineQuery = searchKey;
+        String searchKey = onlineSearchKey(query);
+        if (searchKey.equals(lastOnlineQuery) && dictionaryLookup != null) return;
         cancelDictionarySearch();
+        lastOnlineQuery = searchKey;
         long token = ++dictionaryToken;
         TaishanDictionaryRepository repository = new TaishanDictionaryRepository();
         dictionaryRepository = repository;
@@ -680,6 +685,10 @@ public class TaishanActivity extends LocalizedActivity {
                     updateOnlineCount(result);
                 });
             } catch (Exception exception) {
+                if (exception instanceof TaishanDictionaryRepository.SearchException
+                        && ((TaishanDictionaryRepository.SearchException) exception).cancelled) {
+                    return;
+                }
                 Log.w(TAG, "Online dictionary search failed for " + lastOnlineQuery, exception);
                 mainHandler.post(() -> {
                     if (token != dictionaryToken || binding == null || !onlineMode
@@ -696,6 +705,10 @@ public class TaishanActivity extends LocalizedActivity {
                 });
             }
         });
+    }
+
+    private String onlineSearchKey(String query) {
+        return query + "\u0000" + searchField.name() + "\u0000" + partialMatch;
     }
 
     private void updateOnlineCount(@Nullable TaishanAudioSource.DictionaryResult result) {

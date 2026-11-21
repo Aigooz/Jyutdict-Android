@@ -31,15 +31,13 @@ import org.json.JSONObject;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
-import java.util.Iterator;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-import cc.ecisr.jyutdict.comments.CommentDialogFragment;
-import cc.ecisr.jyutdict.comments.CommentRepository;
 import cc.ecisr.jyutdict.databinding.FragmentResultBinding;
+import cc.ecisr.jyutdict.pronunciation.PronunciationResultParser;
+import cc.ecisr.jyutdict.result.ResultViewState;
 import cc.ecisr.jyutdict.search.DictionaryRecordStore;
 import cc.ecisr.jyutdict.struct.LocationInfo;
 import android.text.SpannableStringBuilder;
@@ -51,9 +49,11 @@ import cc.ecisr.jyutdict.struct.GeneralCharacterManager;
 import cc.ecisr.jyutdict.utils.ColorUtil;
 import cc.ecisr.jyutdict.utils.ChineseTextConverter;
 import cc.ecisr.jyutdict.utils.DiskTextCache;
+import cc.ecisr.jyutdict.utils.HttpUtil;
 import cc.ecisr.jyutdict.utils.ImmersiveBarUtil;
 import cc.ecisr.jyutdict.utils.JyutpingAudioCatalog;
 import cc.ecisr.jyutdict.utils.PronunciationPlayer;
+import cc.ecisr.jyutdict.utils.PronunciationOption;
 import cc.ecisr.jyutdict.utils.MotionUtil;
 import cc.ecisr.jyutdict.utils.ThemeUtil;
 import cc.ecisr.jyutdict.widget.LocationClickSpan;
@@ -80,7 +80,6 @@ public class ResultFragment extends Fragment {
     private Button emptyStateAction;
     private ResultItemAdapter resultAdapter;
     private boolean resultRevealRunning;
-    private CommentRepository commentRepository;
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final ExecutorService parseExecutor = Executors.newSingleThreadExecutor();
     private long parseToken;
@@ -109,7 +108,6 @@ public class ResultFragment extends Fragment {
             }
         });
         ImmersiveBarUtil.applyBottomInsets(mRvMain);
-        commentRepository = new CommentRepository();
         resultAdapter = new ResultItemAdapter();
         mRvMain.setLayoutManager(new LinearLayoutManager(getActivity(), LinearLayoutManager.VERTICAL, false));
         mRvMain.setItemAnimator(null);
@@ -119,10 +117,7 @@ public class ResultFragment extends Fragment {
             rawReceivedData = restoreSavedResult(savedInstanceState);
         }
         if (rawReceivedData != null && !rawReceivedData.isEmpty()) refreshResult();
-        else showEmptyState(
-                R.string.result_initial_title,
-                R.string.result_initial_description,
-                false);
+        else applyResultViewState(ResultViewState.initial());
         return binding.getRoot();
     }
 
@@ -159,13 +154,6 @@ public class ResultFragment extends Fragment {
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         Log.d(TAG, "onViewCreated: " + System.identityHashCode(this));
         super.onViewCreated(view, savedInstanceState);
-        getParentFragmentManager().setFragmentResultListener(
-                CommentDialogFragment.RESULT_KEY,
-                getViewLifecycleOwner(),
-                (requestKey, result) -> updateCommentCount(
-                        result.getString(CommentDialogFragment.RESULT_TYPE, ""),
-                        result.getString(CommentDialogFragment.RESULT_TARGET, ""),
-                        result.getInt(CommentDialogFragment.RESULT_COUNT, 0)));
     }
 
     public void refreshResult() {
@@ -192,9 +180,11 @@ public class ResultFragment extends Fragment {
 
     public void beginLoading() {
         if (mRvMain == null) return;
-        if (emptyState != null) emptyState.setVisibility(View.GONE);
+        ResultViewState state = ResultViewState.loading();
+        hideEmptyState();
+        if (state.listDimmed) mRvMain.setAlpha(0.55f);
         resultRevealRunning = false;
-        MotionUtil.fadeTo(mRvMain, 0.55f);
+        if (state.listDimmed) MotionUtil.fadeTo(mRvMain, 0.55f);
     }
 
     public void finishLoading() {
@@ -270,7 +260,6 @@ public class ResultFragment extends Fragment {
                             || getView() == null) return;
                     resultAdapter.replaceItems(parsedItems);
                     publishResultViews(revealNewResult);
-                    loadCommentCounts();
                     if (resultCountListener != null) {
                         resultCountListener.onResultCount(parsedItems.size());
                     }
@@ -288,12 +277,34 @@ public class ResultFragment extends Fragment {
 
     public void showParseError() {
         if (emptyState == null) return;
-        showEmptyState(R.string.result_error_title, R.string.result_error_data, true);
+        applyResultViewState(ResultViewState.parseError());
     }
 
     public void showNetworkError() {
         if (emptyState == null) return;
-        showEmptyState(R.string.result_error_title, R.string.result_error_network, true);
+        applyResultViewState(ResultViewState.networkError());
+    }
+
+    public void showRequestError(@Nullable HttpUtil.RequestError error) {
+        if (emptyState == null) return;
+        applyResultViewState(ResultViewState.requestError(error));
+    }
+
+    /** Clears stale rows when local validation prevents a new request from being sent. */
+    public void showInvalidRequest() {
+        if (emptyState == null) return;
+        rawReceivedData = null;
+        Context context = getContext();
+        if (context != null) DiskTextCache.remove(context.getApplicationContext(),
+                RESULT_STATE_CACHE);
+        cancelPendingParse();
+        applyResultViewState(ResultViewState.invalidRequestError());
+        if (resultCountListener != null) resultCountListener.onResultCount(0);
+    }
+
+    private void cancelPendingParse() {
+        ++parseToken;
+        if (resultAdapter != null) resultAdapter.clearItems();
     }
 
     private ArrayList<ResultItemAdapter.ResultInfo> parseJsonValidated(
@@ -321,15 +332,14 @@ public class ResultFragment extends Fragment {
                     ResultItemAdapter.ResultInfo item = addItem(parsedItems,
                             spanneds[0], spanneds[1], spanneds[2],
                             spanneds[3], spanneds[4],
-                            ResultItemAdapter.ResultInfo.TYPE_GENERAL,
-                            CommentRepository.TYPE_CHAR, spanneds[0].toString());
+                            ResultItemAdapter.ResultInfo.TYPE_GENERAL);
                     if (item != null) {
                         item.pronunciations = gcm.pronunciationOptions(i);
                     }
                 }
                 break;
             case QUERYING_PRON:
-                parseJsonPron(jsonString, entrySettings, parsedItems);
+                parseJsonPron(jsonString, entrySettings, context, parsedItems);
                 break;
             case QUERYING_SHEET:
                 JyutpingAudioCatalog audioCatalog = JyutpingAudioCatalog.read(context);
@@ -353,9 +363,7 @@ public class ResultFragment extends Fragment {
                             character.printPronunciation(),
                             character.printMeanings(),
                             character.printLocations(),
-                            ResultItemAdapter.ResultInfo.TYPE_SHEET,
-                            CommentRepository.TYPE_SHEET,
-                            entry.optString("鍵", "")
+                            ResultItemAdapter.ResultInfo.TYPE_SHEET
                     );
                     if (item != null) {
                         item.pronunciations = character.pronunciationOptions();
@@ -381,8 +389,9 @@ public class ResultFragment extends Fragment {
             mRvMain.getItemAnimator().endAnimations();
         }
         resultAdapter.notifyDataSetChanged();
-        boolean hasResults = resultAdapter.getItemCount() > 0;
-        updateEmptyState(!hasResults);
+        ResultViewState state = ResultViewState.fromResultCount(resultAdapter.getItemCount());
+        applyResultViewState(state);
+        boolean hasResults = state.page == ResultViewState.Page.CONTENT;
         if (!revealNewResult) {
             resultRevealRunning = false;
             mRvMain.animate().cancel();
@@ -397,18 +406,6 @@ public class ResultFragment extends Fragment {
         MotionUtil.reveal(mRvMain);
     }
 
-    private void updateEmptyState(boolean isEmpty) {
-        if (emptyState == null) return;
-        if (isEmpty) {
-            showEmptyState(
-                    R.string.result_empty_title,
-                    R.string.result_empty_description,
-                    true);
-        } else {
-            emptyState.setVisibility(View.GONE);
-        }
-    }
-
     private void showEmptyState(int titleRes, int textRes, boolean showRetry) {
         if (emptyState == null || emptyStateTitle == null
                 || emptyStateText == null || emptyStateAction == null) return;
@@ -418,7 +415,57 @@ public class ResultFragment extends Fragment {
         emptyState.setVisibility(View.VISIBLE);
     }
 
+    private void hideEmptyState() {
+        if (emptyState != null) emptyState.setVisibility(View.GONE);
+    }
 
+    private void applyResultViewState(ResultViewState state) {
+        if (state.clearResults && resultAdapter != null) {
+            resultAdapter.clearItems();
+            if (mRvMain != null) {
+                mRvMain.stopScroll();
+                mRvMain.scrollToPosition(0);
+            }
+        }
+        switch (state.page) {
+            case INITIAL:
+                showEmptyState(R.string.result_initial_title,
+                        R.string.result_initial_description, state.retryVisible);
+                break;
+            case EMPTY:
+                showEmptyState(R.string.result_empty_title,
+                        R.string.result_empty_description, state.retryVisible);
+                break;
+            case PARSE_ERROR:
+                showEmptyState(R.string.result_error_title,
+                        R.string.result_error_data, state.retryVisible);
+                break;
+            case REQUEST_ERROR:
+                showEmptyState(R.string.result_error_title,
+                        R.string.result_error_request, state.retryVisible);
+                break;
+            case VALIDATION_ERROR:
+                showEmptyState(R.string.result_validation_title,
+                        R.string.result_validation_description, state.retryVisible);
+                break;
+            case NETWORK_ERROR:
+                showEmptyState(R.string.result_error_title,
+                        R.string.result_error_network, state.retryVisible);
+                break;
+            case SERVER_ERROR:
+                showEmptyState(R.string.result_error_title,
+                        R.string.result_error_server, state.retryVisible);
+                break;
+            case CONTENT:
+                hideEmptyState();
+                break;
+            case LOADING:
+                hideEmptyState();
+                break;
+            default:
+                throw new IllegalStateException("Unknown result page: " + state.page);
+        }
+    }
 
     /**
      * 向 ResultItemAdapter 添加一項條文
@@ -438,15 +485,6 @@ public class ResultFragment extends Fragment {
             ArrayList<ResultItemAdapter.ResultInfo> items,
             Spanned chara, Spanned leftMiddle, Spanned leftBottom,
             Spanned rightTop, Spanned rightBottom, int type) {
-        return addItem(items, chara, leftMiddle, leftBottom, rightTop, rightBottom,
-                type, null, null);
-    }
-
-    private ResultItemAdapter.ResultInfo addItem(
-            ArrayList<ResultItemAdapter.ResultInfo> items,
-            Spanned chara, Spanned leftMiddle, Spanned leftBottom,
-            Spanned rightTop, Spanned rightBottom, int type,
-            String commentType, String commentTarget) {
         if (rightTop.length()!=0 || rightBottom.length()!=0) {
             ResultItemAdapter.ResultInfo item = new ResultItemAdapter.ResultInfo(
                     chara,
@@ -454,9 +492,7 @@ public class ResultFragment extends Fragment {
                     leftBottom,
                     rightTop,
                     rightBottom,
-                    type,
-                    commentType,
-                    commentTarget
+                    type
             );
             items.add(item);
             return item;
@@ -464,116 +500,32 @@ public class ResultFragment extends Fragment {
         return null;
     }
 
-    private void loadCommentCounts() {
-        LinkedHashSet<String> charTargets = new LinkedHashSet<>();
-        LinkedHashSet<String> sheetTargets = new LinkedHashSet<>();
-        if (resultAdapter == null) return;
-        for (int index = 0; index < resultAdapter.getItemCount(); index++) {
-            ResultItemAdapter.ResultInfo.CommentTarget metadata =
-                    resultAdapter.getItem(index).commentTarget;
-            if (metadata == null || metadata.target.isEmpty()) continue;
-            if (CommentRepository.TYPE_CHAR.equals(metadata.type)) {
-                charTargets.add(metadata.target);
-            } else if (CommentRepository.TYPE_SHEET.equals(metadata.type)) {
-                sheetTargets.add(metadata.target);
-            }
-        }
-        requestCommentCounts(CommentRepository.TYPE_CHAR, new ArrayList<>(charTargets));
-        requestCommentCounts(CommentRepository.TYPE_SHEET, new ArrayList<>(sheetTargets));
-    }
-
-    private void requestCommentCounts(String type, List<String> targets) {
-        if (targets.isEmpty()) return;
-        commentRepository.getCounts(type, targets, (counts, errorMessage) -> {
-            if (!isAdded() || counts == null || mRvMain == null
-                    || resultAdapter == null) return;
-            for (int index = 0; index < resultAdapter.getItemCount(); index++) {
-                ResultItemAdapter.ResultInfo.CommentTarget metadata =
-                        resultAdapter.getItem(index).commentTarget;
-                if (metadata == null || !type.equals(metadata.type)) continue;
-                Integer count = counts.get(metadata.target);
-                if (count == null) continue;
-                metadata.count = count;
-                metadata.countLoaded = true;
-                resultAdapter.notifyItemChanged(index);
-            }
-        });
-    }
-
-    private void updateCommentCount(String type, String target, int count) {
-        if (resultAdapter == null) return;
-        for (int index = 0; index < resultAdapter.getItemCount(); index++) {
-            ResultItemAdapter.ResultInfo.CommentTarget metadata =
-                    resultAdapter.getItem(index).commentTarget;
-            if (metadata == null || !type.equals(metadata.type) || !target.equals(metadata.target)) {
-                continue;
-            }
-            metadata.count = count;
-            metadata.countLoaded = true;
-            resultAdapter.notifyItemChanged(index);
-        }
-    }
-
-    private void parseJsonPron(String jsonString, EntrySetting entrySettings,
+    private void parseJsonPron(String jsonString, EntrySetting entrySettings, Context context,
                                ArrayList<ResultItemAdapter.ResultInfo> parsedItems)
             throws JSONException {
-        JSONObject root = new JSONObject(jsonString);
-        JSONArray books = root.optJSONArray("韻書"), areas = root.optJSONArray("各地");
-        if (books != null) {
-            for (int index = 0; index < books.length(); index++) {
-                JSONObject book = books.optJSONObject(index);
-                if (book == null) continue;
-                String name = ChineseTextConverter.display(
-                        book.optString("__name", "韻書"));
-                if (!pronBookFilter.contains(name)) {
-                    addPronunciationItem(parsedItems, new SpannableStringBuilder(name),
-                            formatPronunciations(book, "__name"));
-                }
-            }
+        List<PronunciationResultParser.Entry> entries = PronunciationResultParser.parse(
+                jsonString,
+                ChineseTextConverter::display,
+                locationId -> {
+                    LocationInfo.Location location = LocationInfo.get(locationId);
+                    return location == null ? "id=" + locationId : location.displayName();
+                },
+                (leftId, rightId) -> LocationInfo.compareGeographically(
+                        LocationInfo.get(leftId), LocationInfo.get(rightId)),
+                pronBookFilter,
+                pronCityFilter);
+        JyutpingAudioCatalog audioCatalog = JyutpingAudioCatalog.read(
+                context.getApplicationContext());
+        for (PronunciationResultParser.Entry entry : entries) {
+            SpannableStringBuilder label = entry.kind
+                    == PronunciationResultParser.Entry.Kind.BOOK
+                    ? new SpannableStringBuilder(entry.label)
+                    : locationLabel(LocationInfo.get(entry.locationId),
+                            entry.locationId, entrySettings);
+            addPronunciationItem(parsedItems, label,
+                    new SpannableStringBuilder(entry.pronunciations),
+                    entry.readings, audioCatalog);
         }
-        if (areas != null) {
-            ArrayList<JSONObject> sortedAreas = new ArrayList<>(areas.length());
-            for (int index = 0; index < areas.length(); index++) {
-                JSONObject area = areas.optJSONObject(index);
-                if (area != null) sortedAreas.add(area);
-            }
-            Collections.sort(sortedAreas, (left, right) -> {
-                int leftId = left.optInt("__id", -1);
-                int rightId = right.optInt("__id", -1);
-                int comparison = LocationInfo.compareGeographically(
-                        LocationInfo.get(leftId), LocationInfo.get(rightId));
-                return comparison == 0 ? Integer.compare(leftId, rightId) : comparison;
-            });
-            for (JSONObject area : sortedAreas) {
-                int locationId = area.optInt("__id", -1);
-                if (locationId != -1 && pronCityFilter.contains(String.valueOf(locationId))) {
-                    continue;
-                }
-                addPronunciationItem(parsedItems,
-                        locationLabel(LocationInfo.get(locationId), locationId, entrySettings),
-                        formatPronunciations(area, "__id"));
-            }
-        }
-    }
-
-    private SpannableStringBuilder formatPronunciations(JSONObject source, String metadataKey) {
-        SpannableStringBuilder result = new SpannableStringBuilder();
-        Iterator<String> syllables = source.keys();
-        while (syllables.hasNext()) {
-            String syllable = syllables.next();
-            if (metadataKey.equals(syllable)) continue;
-            JSONObject tones = source.optJSONObject(syllable);
-            if (tones == null) continue;
-            Iterator<String> toneKeys = tones.keys();
-            while (toneKeys.hasNext()) {
-                String tone = toneKeys.next();
-                String characters = tones.optString(tone, "");
-                if (characters.isEmpty()) continue;
-                if (result.length() > 0) result.append("\n");
-                result.append(syllable).append(tone).append(": ").append(characters);
-            }
-        }
-        return result;
     }
 
     private SpannableStringBuilder locationLabel(LocationInfo.Location location, int id,
@@ -594,11 +546,21 @@ public class ResultFragment extends Fragment {
     }
 
     private void addPronunciationItem(ArrayList<ResultItemAdapter.ResultInfo> items,
-                                      Spanned label, Spanned pronunciations) {
+                                      Spanned label, Spanned pronunciations,
+                                      List<String> readings, JyutpingAudioCatalog audioCatalog) {
         if (pronunciations.length() == 0) return;
-        addItem(items, new SpannableStringBuilder(), new SpannableStringBuilder(),
+        ResultItemAdapter.ResultInfo item = addItem(
+                items, new SpannableStringBuilder(), new SpannableStringBuilder(),
                 new SpannableStringBuilder(), label, pronunciations,
                 ResultItemAdapter.ResultInfo.TYPE_GENERAL);
+        if (item == null) return;
+        ArrayList<PronunciationOption> options = new ArrayList<>();
+        for (String reading : readings) {
+            if (audioCatalog.resolveSequence(reading).isEmpty()) continue;
+            PronunciationOption option = new PronunciationOption("", reading);
+            if (!options.contains(option)) options.add(option);
+        }
+        item.pronunciations = options;
     }
 
 }

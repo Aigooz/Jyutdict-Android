@@ -44,6 +44,9 @@ public final class AppUpdateClient {
             String assetApiUrl,
             String assetDownloadUrl,
             long assetSize,
+            String checksumApiUrl,
+            String checksumDownloadUrl,
+            long checksumSize,
             String releaseBody
     ) {
         public boolean hasAsset() {
@@ -117,6 +120,11 @@ public final class AppUpdateClient {
                         context.getString(cc.ecisr.jyutdict.R.string.version_status_failed));
             }
             boolean hasUpdate = info.hasAsset() && info.buildNumber > BuildConfig.UPDATE_BUILD;
+            if (hasUpdate && (info.checksumDownloadUrl().isEmpty()
+                    && info.checksumApiUrl().isEmpty())) {
+                throw new UpdateException(context.getString(
+                        cc.ecisr.jyutdict.R.string.version_checksum_missing));
+            }
             return new UpdateResult(info, hasUpdate, null);
         } finally {
             if (connection != null) connection.disconnect();
@@ -183,27 +191,40 @@ public final class AppUpdateClient {
                     "",
                     "",
                     0,
+                    "",
+                    "",
+                    0,
                     release.optString("body", "")
             );
 
         JSONArray assets = release.optJSONArray("assets");
         if (assets != null) {
+            JSONObject apkAsset = null;
+            JSONObject checksumAsset = null;
             for (int index = 0; index < assets.length(); index++) {
                 JSONObject asset = assets.optJSONObject(index);
                 if (asset == null) continue;
                 String name = asset.optString("name", "");
                 if (name.endsWith(".apk") && name.contains("dual")) {
-                    return new ReleaseInfo(
-                            tag,
-                            version,
-                            build,
-                            name,
-                            asset.optString("url", ""),
-                            asset.optString("browser_download_url", ""),
-                            asset.optLong("size", 0),
-                            release.optString("body", "")
-                    );
+                    apkAsset = asset;
+                } else if (name.equals("SHA256SUMS")) {
+                    checksumAsset = asset;
                 }
+            }
+            if (apkAsset != null) {
+                return new ReleaseInfo(
+                        tag,
+                        version,
+                        build,
+                        apkAsset.optString("name", ""),
+                        apkAsset.optString("url", ""),
+                        apkAsset.optString("browser_download_url", ""),
+                        apkAsset.optLong("size", 0),
+                        checksumAsset == null ? "" : checksumAsset.optString("url", ""),
+                        checksumAsset == null ? "" : checksumAsset.optString("browser_download_url", ""),
+                        checksumAsset == null ? 0 : checksumAsset.optLong("size", 0),
+                        release.optString("body", "")
+                );
             }
         }
         return info;

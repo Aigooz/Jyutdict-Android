@@ -46,21 +46,10 @@ public final class SearchViewModel extends ViewModel {
     private final Client client;
     private final MutableLiveData<State> uiState =
             new MutableLiveData<>(state(Status.IDLE, null, null, null));
+    private int requestGeneration;
 
     public SearchViewModel() {
-        this(new Client() {
-            private final HttpUtil request = new HttpUtil();
-
-            @Override
-            public void search(@NonNull String url, @NonNull HttpUtil.Callback callback) {
-                request.enqueue(url, callback);
-            }
-
-            @Override
-            public void cancel() {
-                request.cancel();
-            }
-        });
+        this(new SearchHttpClient());
     }
 
     SearchViewModel(Client client) {
@@ -72,18 +61,27 @@ public final class SearchViewModel extends ViewModel {
     }
 
     public void search(@NonNull Request request) {
+        int generation = ++requestGeneration;
         uiState.setValue(state(Status.LOADING, request, null, null));
         client.search(request.url, new HttpUtil.Callback() {
             @Override
             public void onSuccess(@NonNull String responseBody) {
-                uiState.setValue(state(Status.SUCCESS, request, responseBody, null));
+                publishIfCurrent(generation,
+                        state(Status.SUCCESS, request, responseBody, null));
             }
 
             @Override
             public void onFailure(@NonNull HttpUtil.RequestError error) {
-                uiState.setValue(state(Status.ERROR, request, null, error));
+                publishIfCurrent(generation,
+                        state(Status.ERROR, request, null, error));
             }
         });
+    }
+
+    private void publishIfCurrent(int generation, State state) {
+        if (generation != requestGeneration) return;
+        requestGeneration++;
+        uiState.setValue(state);
     }
 
     private static State state(Status status, Request request, String body,
@@ -93,6 +91,17 @@ public final class SearchViewModel extends ViewModel {
 
     @Override
     protected void onCleared() {
+        cancelInternal();
+    }
+
+    /** Cancels the active request and prevents its state from being replayed later. */
+    public void cancel() {
+        cancelInternal();
+        uiState.setValue(state(Status.IDLE, null, null, null));
+    }
+
+    private void cancelInternal() {
+        requestGeneration++;
         client.cancel();
     }
 }

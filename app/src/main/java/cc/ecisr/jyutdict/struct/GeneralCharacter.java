@@ -40,6 +40,10 @@ public class GeneralCharacter {
         public final ArrayList<String> jingwaa = new ArrayList<>(1);
     }
 
+    GeneralCharacter(String head) {
+        this.head = head;
+    }
+
     public GeneralCharacter(JSONObject charaJson) {
         head = charaJson.optString("字");
 

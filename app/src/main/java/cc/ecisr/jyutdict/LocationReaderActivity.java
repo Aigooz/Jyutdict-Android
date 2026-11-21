@@ -5,9 +5,12 @@ import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
 import android.webkit.WebSettings;
+import android.webkit.WebChromeClient;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.webkit.JavascriptInterface;
 
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 
 import org.json.JSONException;
@@ -27,12 +30,15 @@ import cc.ecisr.jyutdict.utils.ThemeUtil;
 /** 地點介紹與程序音系表共用的只讀頁。 */
 public class LocationReaderActivity extends LocalizedActivity {
     private static final String URL_API_BASE = "https://jyutdict.org/api/v1.0/";
+    private static final String STATE_LOADING = "reader_loading";
     private static final String EXTRA_MODE = "mode";
     private static final String EXTRA_LOCATION_ID = "location_id";
     private static final String EXTRA_LOCATION_NAME = "location_name";
     private static final String EXTRA_SHEET_STATISTIC = "sheet_statistic";
     private static final String MODE_ARTICLE = "article";
     private static final String MODE_PHONOLOGY = "phonology";
+    private static final String STATE_WEB_VIEW = "reader_web_view";
+    private static final String STATE_PHONOLOGY_SCROLL = "phonology_scroll";
     private static final long ARTICLE_CACHE_MAX_AGE = 24L * 60L * 60L * 1000L;
     private static final long PHONOLOGY_CACHE_FALLBACK_MAX_AGE =
             7L * 24L * 60L * 60L * 1000L;
@@ -43,6 +49,8 @@ public class LocationReaderActivity extends LocalizedActivity {
     private String locationName;
     private String sheetStatistic;
     private int locationId;
+    private boolean loading;
+    private int phonologyScrollLeft;
 
     public static Intent articleIntent(Context context, String locationName) {
         return new Intent(context, LocationReaderActivity.class)
@@ -89,8 +97,27 @@ public class LocationReaderActivity extends LocalizedActivity {
         }
 
         configureWebView();
+        boolean restoredRequestInFlight = savedInstanceState != null
+                && savedInstanceState.getBoolean(STATE_LOADING);
+        boolean restoredWebView = savedWebViewHasContent(savedInstanceState, restoredRequestInFlight);
         binding.readerError.setOnClickListener(v -> load(true));
-        load(false);
+        if (restoredWebView) {
+            if (MODE_PHONOLOGY.equals(mode)) {
+                phonologyScrollLeft = savedInstanceState.getInt(STATE_PHONOLOGY_SCROLL, 0);
+            }
+            MotionUtil.showOnly(binding.readerStateContainer, binding.readerWebView,
+                    binding.readerProgress, binding.readerError, binding.readerWebView);
+        } else {
+            load(restoredRequestInFlight);
+        }
+    }
+
+    private boolean savedWebViewHasContent(Bundle savedInstanceState,
+                                           boolean restoredRequestInFlight) {
+        if (savedInstanceState == null || restoredRequestInFlight) return false;
+        Bundle webViewState = savedInstanceState.getBundle(STATE_WEB_VIEW);
+        return webViewState != null
+                && binding.readerWebView.restoreState(webViewState) != null;
     }
 
     private void configureWebView() {
@@ -105,6 +132,11 @@ public class LocationReaderActivity extends LocalizedActivity {
         settings.setTextZoom(105);
         settings.setAllowFileAccess(false);
         settings.setAllowContentAccess(false);
+        if (MODE_PHONOLOGY.equals(mode)) {
+            binding.readerWebView.setWebChromeClient(new WebChromeClient());
+            binding.readerWebView.addJavascriptInterface(
+                    new PhonologyScrollBridge(), "Android");
+        }
         binding.readerWebView.setWebViewClient(new WebViewClient() {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, String url) {
@@ -119,7 +151,15 @@ public class LocationReaderActivity extends LocalizedActivity {
         });
     }
 
+    private final class PhonologyScrollBridge {
+        @JavascriptInterface
+        public void onPhonologyScroll(int scrollLeft) {
+            phonologyScrollLeft = Math.max(scrollLeft, 0);
+        }
+    }
+
     private void load(boolean forceNetwork) {
+        loading = true;
         MotionUtil.showOnly(binding.readerStateContainer, binding.readerProgress,
                 binding.readerProgress, binding.readerError, binding.readerWebView);
 
@@ -131,6 +171,7 @@ public class LocationReaderActivity extends LocalizedActivity {
                     : ARTICLE_CACHE_MAX_AGE;
             String cached = DiskTextCache.readFresh(this, cacheKey(), maxAge);
             if (cached != null) {
+                loading = false;
                 showResponse(cached);
                 return;
             }
@@ -152,6 +193,7 @@ public class LocationReaderActivity extends LocalizedActivity {
         request.enqueue(url.build(), new HttpUtil.Callback() {
             @Override
             public void onSuccess(String body) {
+                loading = false;
                 if (isFinishing() || isDestroyed()) return;
                 DiskTextCache.write(LocationReaderActivity.this, cacheKey(), body);
                 showResponse(body);
@@ -159,6 +201,7 @@ public class LocationReaderActivity extends LocalizedActivity {
 
             @Override
             public void onFailure(HttpUtil.RequestError error) {
+                loading = false;
                 if (isFinishing() || isDestroyed()) return;
                 String stale = DiskTextCache.readAny(LocationReaderActivity.this, cacheKey());
                 if (stale == null) showError(R.string.info_load_error_retry);
@@ -192,9 +235,13 @@ public class LocationReaderActivity extends LocalizedActivity {
                 );
                 html = ChineseTextConverter.display(html);
             }
+            String htmlToLoad = html;
+            if (MODE_PHONOLOGY.equals(mode)) {
+                htmlToLoad = PhonologyHtmlRenderer.withScrollLeft(html, phonologyScrollLeft);
+            }
             binding.readerWebView.loadDataWithBaseURL(
                     "https://jyutdict.org/",
-                    html,
+                    htmlToLoad,
                     "text/html",
                     "UTF-8",
                     null
@@ -207,9 +254,22 @@ public class LocationReaderActivity extends LocalizedActivity {
     }
 
     private void showError(int message) {
+        loading = false;
         binding.readerError.setText(message);
         MotionUtil.showOnly(binding.readerStateContainer, binding.readerError,
                 binding.readerProgress, binding.readerError, binding.readerWebView);
+    }
+
+    @Override
+    protected void onSaveInstanceState(@NonNull Bundle outState) {
+        outState.putBoolean(STATE_LOADING, loading);
+        if (binding != null) {
+            Bundle webViewState = new Bundle();
+            binding.readerWebView.saveState(webViewState);
+            outState.putBundle(STATE_WEB_VIEW, webViewState);
+            outState.putInt(STATE_PHONOLOGY_SCROLL, phonologyScrollLeft);
+        }
+        super.onSaveInstanceState(outState);
     }
 
     @Override
